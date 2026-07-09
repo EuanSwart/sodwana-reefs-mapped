@@ -104,22 +104,20 @@ def _load_geojson_tolerant(path: Path):
         return json.loads(text).get("features", [])
     except json.JSONDecodeError:
         pass
-    feats, depth, start = [], 0, None
+    feats, starts = [], []
     for i, ch in enumerate(text):
         if ch == "{":
-            if depth == 0:
-                start = i
-            depth += 1
+            starts.append(i)
         elif ch == "}":
-            depth -= 1
-            if depth == 0 and start is not None:
-                chunk = text[start:i + 1]
-                if '"Feature"' in chunk:
-                    try:
-                        feats.append(json.loads(chunk))
-                    except json.JSONDecodeError:
-                        pass
-                start = None
+            if not starts:
+                continue
+            start = starts.pop()
+            chunk = text[start:i + 1]
+            if '"Feature"' in chunk:
+                try:
+                    feats.append(json.loads(chunk))
+                except json.JSONDecodeError:
+                    pass
     log(f"salvaged {len(feats)} complete features from truncated {path.name}")
     return feats
 

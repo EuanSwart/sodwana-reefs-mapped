@@ -140,6 +140,28 @@ function isobathStyle(map, id) {
   });
 }
 
+function diveSiteStyle(map, id) {
+  map.addLayer({
+    id: 'sites-dot', type: 'circle', source: id,
+    paint: {
+      'circle-radius': 5,
+      'circle-color': ['case', ['==', ['get', 'verified'], false], '#ff9f6b', '#ffd400'],
+      'circle-stroke-color': '#0a1830', 'circle-stroke-width': 1.5,
+    },
+  });
+  map.addLayer({
+    id: 'sites-label', type: 'symbol', source: id,
+    layout: {
+      'text-field': ['get', 'name'], 'text-font': ['Noto Sans Regular'], 'text-size': 11,
+      'text-offset': [0, 1.1], 'text-anchor': 'top',
+    },
+    paint: { 'text-color': '#ffffff', 'text-halo-color': '#0a1830', 'text-halo-width': 1.2 },
+  });
+  map.on('click', 'sites-dot', (e) => sitePopup(map, e.features[0]));
+  map.on('mouseenter', 'sites-dot', () => (map.getCanvas().style.cursor = 'pointer'));
+  map.on('mouseleave', 'sites-dot', () => (map.getCanvas().style.cursor = ''));
+}
+
 function entryStyle(map, id) {
   // Individual Garmin dive-entry GPS fixes — a density cloud under the named-site markers.
   map.addLayer({ id: 'entries-dot', type: 'circle', source: id, layout: { visibility: 'none' },
