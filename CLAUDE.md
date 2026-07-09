@@ -266,3 +266,4 @@ irmed-cause systematic bias still count as honest, or does it need a proper datu
   with the same exit criteria as the existing accuracy loop (pass → wire in + document; improves
   but still fails → report the honest number, same as today; no improvement → discard + document).
 - [session 2026-07-09T21:45Z] review pipeline output; append real discoveries here.
+- [session 2026-07-09T22:18Z] review pipeline output; append real discoveries here.
