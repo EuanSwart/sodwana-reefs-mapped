@@ -154,7 +154,7 @@ def _write_report(dem, rows, r_shallow, r_mid, gates):
               f"- 15–25 m: RMSE {r_mid:.2f} m (cap {gates['rmse_15_25m_max']})", "",
               "_Euan's GPS points are validation only and never trained on. "
               "Where data is absent, values read N/A rather than being interpolated._"]
-    (REPORTS / "accuracy_report.md").write_text("\n".join(lines) + "\n")
+    (REPORTS / "accuracy_report.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
     log("wrote reports/accuracy_report.md")
 
 
