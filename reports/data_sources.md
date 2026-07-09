@@ -62,3 +62,49 @@ contribute your own via a Trusted Node / OpenCPN / Navionics logging. Feeds the 
 - **Context / QA only**: GEBCO, published figures, Navionics.
 
 Sources: see the linked references in the session summary.
+
+## Session 2026-07-09 addendum — new candidates checked (see reports/new_data_sources_evaluation_2026-07-09.md for full detail)
+
+### New, worth pursuing
+- **de Wet & Compton (2021) SA shelf bathymetry** — free 28 MB zip, no login, at
+  johnscompton.com/maps/. This is the real source behind the `dewet_compton` fusion tier that's
+  already wired in `config/params.yaml` but has never had a file. Download → `data/raw/dewet_compton_points.csv`
+  (lon,lat,depth_m) → test with `reports/eval_scratch/rmse_against_holdout.py` before trusting it.
+- **Copernicus Marine BATHYMETRY_GLO_PHY_COASTAL_L4_MY_016_001** — 100 m Sentinel-2 SDB, free
+  account required. 3 of its 4 bands share our own optical-wall weakness; the `phy_wk`
+  (wave-kinematics) band uses different physics and is the one worth testing past 15-20 m once
+  Euan registers a free account. Coverage over Sodwana not yet confirmed either way.
+- **OSM Overpass seamark depths** — keyless, but likely sparse off this coastline; quick manual
+  check at overpass-turbo.eu worth doing, expect reference-tier value only.
+
+### Reference only (not fusion candidates)
+- UKZN integrated KZN bathymetric GIS (Young 2009 thesis) — coarser than what's already integrated;
+  useful only as a bibliography of historical KZN surveys.
+
+### Rejected
+- NOAA ETOPO 2022 — same resolution class as already-integrated GEBCO/GMRT, redundant.
+- SA Navy Hydrographic Office charts — commercial only, violates $0 budget.
+- iSimangaliso Wetland Park downloads — visitor PDF maps only, no GIS data.
+
+## Session 2026-07-09 addendum #2 — six papers reviewed (see reports/paper_review_2026-07-09.md)
+
+### Best new lead: real multibeam data exists, held by named contacts
+- **Green, A.N. (2009) PhD thesis** (UKZN) confirms a **Reson Seabat 8111 multibeam survey, 392 km²,
+  29-838 m depth, ~1 m resolution**, covering Leven Point→Island Rock (essentially the whole AOI's
+  canyon system) — but raw SEG-Y/grid data was explicitly withheld from the thesis (Appendix 4).
+  Contacts to chase: **Peter Ramsay, Marine GeoSolutions (Pty) Ltd** (physically collected the data,
+  106 Clark Road, Glenwood, Durban 4001); **Dr Andrew Green** (greena1@ukzn.ac.za, PI); **Council for
+  Geoscience Marine Geoscience Unit** (Private Bag X112, Pretoria — co-funded, same institution as
+  the already-integrated 2005 CGS survey).
+- **Salzmann (2013) MSc thesis** independently corroborates: Green's group holds data over Mabibi/
+  Sodwana/Diepgat/Leadsman/Leven canyons specifically.
+
+### Reference-only (real canyon numbers, no digital grid)
+- **Ramsay (1991) PhD thesis** — canyon table: Wright Canyon to −453 m, White Sands Canyon to
+  −353 m, Jesser/Beacon canyons with gradient/orientation data. 1991-era Surfer map, no digital
+  soundings found; GPS accuracy ~48 m error (era-appropriate, too coarse to fuse as-is).
+- **Ramsay (1994) Marine Geology paper** — paywalled, abstract only; condensed version of the above.
+
+### Out of scope
+- **Miller (1998) MSc thesis** — Lake Sibaya is an inland freshwater lake outside the ocean AOI.
+  Dropped as a primary source; only useful as a citation pointing back to Ramsay 1991/1996/1997.

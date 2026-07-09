@@ -60,10 +60,23 @@ fusion:
   priority:                # index 0 = highest priority (laid first; fills only empty cells)
     - "priority_multibeam" # data/priority/*.tif (empty now, wired in)
     - "atl24"              # gridded along-track lidar (train split only)
+    - "copernicus_phy_wk"  # TESTED 2026-07-10, DISABLED by default (copernicus_phy_wk_enabled:
+                           # false) — see copernicus_phy_wk_enabled below for why
     - "sdb"                # sdb_10m.tif (0 -> optical limit) — owns the validated optical zone
     - "cgs_isobath"        # CGS 2005 survey isobaths gridded — fills deeper/offshore gaps
-    - "dewet_compton"      # sparse deep single-beam soundings
+    - "dewet_compton"      # REJECTED 2026-07-10 (RMSE 41/336m vs holdout) — never wired in
     - "gebco_gmrt"         # smooth deep-water fill (last resort)
+  copernicus_band_m: [-25.0, -15.0]  # depth band (by SDB's own value) where phy_wk WOULD override SDB
+  # 2026-07-10: implemented + validated, then DISABLED. Copernicus phy_wk's own aggregate RMSE in
+  # the 15-25m band (2.95m) beats SDB's aggregate (4.90m), so it looked promising -- but gating the
+  # swap on "SDB's own value falls in 15-25m" does NOT select for "where SDB is wrong": at the 35
+  # holdout points where it actually fired, SDB was already accurate (RMSE 1.13m) and Copernicus
+  # made it WORSE there (RMSE 2.96m) because of its own ~1.2m bias. Net effect on the real gate:
+  # 15-25m RMSE 4.90m -> 5.06m, a regression, not an improvement. Left here disabled + documented
+  # (not deleted) in case a better selection criterion (e.g. local disagreement/uncertainty mask
+  # instead of raw SDB depth) is worth trying later. Do not re-enable without re-running
+  # pipeline/validate.py and confirming an actual improvement, not just a plausible-sounding one.
+  copernicus_phy_wk_enabled: false
   atl24_grid:
     blockmedian_res_m: 10
     surface_tension: 0.35
@@ -119,5 +132,6 @@ ramp:
     - [-60,  "#001f7a"]
     - [-120, "#050510"]
   hillshade: "igor"
-  contour_interval_m: 5
+  contour_interval_m: 2  # intermediate (zoom-13) minor interval; matches app.js's live `thresholds` object,
+                          # which is the actual runtime source of truth (no build step reads this value)
   contour_interval_highzoom_m: 1

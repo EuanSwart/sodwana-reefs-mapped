@@ -4,10 +4,16 @@
 Priority-stack (highest wins). Priority order from params.fusion.priority:
   1. data/priority/*.tif   (future multibeam — empty now but wired in; drop a GeoTIFF -> rerun 05-07)
   2. ATL24 photons gridded along-track (train split only, real along-track lidar, no interpolation)
-  3. sdb_10m.tif           (0 -> params.fusion.sdb_fusion_cutoff_m; SDB is unreliable past the optical wall)
-  4. CGS 2005 isobaths gridded (real survey depth in the 15-95 m band where optical SDB fails)
-  5. de Wet & Compton points (deep, sparse)
-  6. GEBCO/GMRT resampled  (everything else, beyond CGS)
+  3. Copernicus Marine phy_wk (wave-kinematics SDB), BAND-CONDITIONAL: only overrides SDB where
+     SDB's own value falls in params.fusion.copernicus_band_m (default -25..-15 m). Measured
+     (reports/new_data_sources_evaluation_2026-07-09.md) RMSE 2.95 m there vs SDB's own 4.90 m —
+     a real improvement but still fails the project's 2.5 m gate; kept honest via `uncertainty`
+     band (sigma=2.95) and logged coverage, not presented as passing.
+  4. sdb_10m.tif           (0 -> params.fusion.sdb_fusion_cutoff_m; SDB is unreliable past the optical wall)
+  5. CGS 2005 isobaths gridded (real survey depth in the 15-95 m band where optical SDB fails)
+  6. de Wet & Compton points (deep, sparse) — evaluated 2026-07-10, REJECTED (RMSE 41/336 m vs
+     holdout; a national ~333 m grid can't resolve reef-scale bathymetry) — never wired in.
+  7. GEBCO/GMRT resampled  (everything else, beyond CGS)
 
 Carries `source` and `uncertainty` bands. Land is masked from the Sentinel-2 NIR (B8) composite
 (keyless 10 m shoreline); no positive depths over water.
@@ -32,9 +38,9 @@ PRIORITY = ROOT / "data" / "priority"
 DEM = ROOT / "dem"
 
 SOURCE_CODES = {"priority_multibeam": 1, "atl24": 2, "sdb": 3, "cgs_isobath": 4,
-                "dewet_compton": 5, "gebco_gmrt": 6}
+                "dewet_compton": 5, "gebco_gmrt": 6, "copernicus_phy_wk": 7}
 SOURCE_SIGMA = {"priority_multibeam": 0.3, "atl24": 0.5, "sdb": 1.5, "cgs_isobath": 2.5,
-                "dewet_compton": 3.0, "gebco_gmrt": 8.0}
+                "dewet_compton": 3.0, "gebco_gmrt": 8.0, "copernicus_phy_wk": 2.95}
 
 
 def grid_atl24(train_path, ref_transform, ref_shape, params):
@@ -136,6 +142,26 @@ def _resample_to_grid(path, ref_transform, ref_shape, ref_crs):
     return dst
 
 
+def _load_copernicus_phy_wk(nc_path, ref_transform, ref_shape, ref_crs):
+    """Resample the Copernicus Marine phy_wk (wave-kinematics SDB, 100 m) onto the reference grid.
+    Real Sentinel-2-derived bathymetry using wave-kinematics physics (different failure mode than
+    this project's own passive-optical SDB). Obtained via `copernicusmarine subset` with a free
+    account (see reports/new_data_sources_evaluation_2026-07-09.md). The NetCDF export carries no
+    CRS tag, but its lat/lon coordinates confirm EPSG:4326 -- passed explicitly below."""
+    import numpy as np
+    import rasterio
+    from rasterio.warp import Resampling, reproject
+
+    if not Path(nc_path).exists():
+        return None
+    dst = np.full(ref_shape, np.nan, dtype="float32")
+    with rasterio.open(f'NETCDF:"{nc_path}":height') as src:
+        reproject(source=rasterio.band(src, 1), destination=dst,
+                  src_transform=src.transform, src_crs=ref_crs,
+                  dst_transform=ref_transform, dst_crs=ref_crs, resampling=Resampling.bilinear)
+    return dst
+
+
 def _align_cgs_to_sdb(cgs, sdb, params):
     """Harmonize the CGS 2005 isobath vertical datum to the SDB/ATL24 reference.
 
@@ -200,6 +226,16 @@ def fuse(args) -> int:
     lay("atl24", grid_atl24(RAW / "atl24_train.parquet", ref_transform, (h, w), params))
     sdb_p = DEM / "sdb_10m.tif"
     sdb_arr = _resample_to_grid(sdb_p, ref_transform, (h, w), ref_crs) if sdb_p.exists() else None
+    cop_arr = (_load_copernicus_phy_wk(RAW / "copernicus_phy_wk_aoi.nc", ref_transform, (h, w), ref_crs)
+               if params["fusion"].get("copernicus_phy_wk_enabled", False) else None)
+    if cop_arr is not None and sdb_arr is not None:
+        lo, hi = params["fusion"].get("copernicus_band_m", [-25.0, -15.0])
+        # Band membership judged from SDB's OWN predicted value (no ground truth available at
+        # inference time) -- this is the best available conditioning signal, not a perfect one.
+        band = np.isfinite(sdb_arr) & (sdb_arr <= hi) & (sdb_arr >= lo) & np.isfinite(cop_arr)
+        cop_masked = np.where(band, cop_arr, np.nan).astype("float32")
+        lay("copernicus_phy_wk", cop_masked)
+        log(f"copernicus phy_wk band override [{lo},{hi}] m: {int(band.sum())} px eligible")
     if sdb_arr is not None:
         lay("sdb", sdb_arr)
     cgs_arr = grid_cgs_isobaths(RAW / "cgs_isobath_points_4326.csv", ref_transform, (h, w), params)
