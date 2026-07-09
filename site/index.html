@@ -5,80 +5,192 @@
   <title>Sodwana Bay Bathymetry — Red Sands → Mabibi</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="Free, high-resolution interactive seafloor map of Sodwana Bay for scuba training and reef prospecting. No API keys." />
-  <!-- Vendored-first, CDN fallback. Drop maplibre-gl.js/.css + maplibre-contour into site/vendor/ for full offline use. -->
   <link href="vendor/maplibre-gl.css" rel="stylesheet"
         onerror="this.onerror=null;this.href='https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css';" />
   <style>
-    :root { --panel:#0d1526e6; --edge:#24406b; --accent:#00e5ff; }
-    html,body { margin:0; height:100%; background:#0a0f1c; color:#dfeaff;
-      font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+    :root {
+      /* ---- base chrome ---- */
+      --bg:#0a0f1c;
+      --panel:#0d1526e6;
+      --panel-solid:#0d1526;
+      --panel-2:#101d33;
+      --edge:#24406b;
+      --edge-soft:#1b2c4d;
+      --ink:#dfeaff;
+      --ink-dim:#8fb3e0;
+      --ink-faint:#7e9bc4;
+      --accent:#00e5ff;
+      --accent-press:#1b8fb0;
+      /* ---- shared depth ramp (mirrors style.json color-relief + app.js) ---- */
+      --depth-120:#050510;
+      --depth-60:#001f7a;
+      --depth-30:#0077ff;
+      --depth-10:#00e5ff;
+      --depth-0:#eafaff;
+      /* ---- categorical accents (harmonised) ---- */
+      --c-site:#ffd400;
+      --c-site-unverified:#ff9f6b;
+      --c-reef-prominent:#c1440e;
+      --c-reef:#e8722c;
+      --c-reef-scattered:#f2b134;
+      --c-sed-coarse:#b9a67d;
+      --c-sed-sand:#e3d7b4;
+      --c-track:#63e6c0;
+      --c-prospect:#ff5db1;
+      --c-prospect-ok:#4dff88;
+      --c-entry:#5ad1ff;
+      /* ---- type scale ---- */
+      --fs-xs:11px; --fs-sm:12px; --fs-md:13px; --fs-lg:15px;
+      /* ---- spacing / shape ---- */
+      --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px;
+      --radius:10px; --radius-sm:6px;
+      --shadow:0 6px 24px #00060f66;
+    }
+    html,body { margin:0; height:100%; background:var(--bg); color:var(--ink);
+      font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
     #map { position:absolute; inset:0; }
-    .panel { position:absolute; background:#0d1526e6; border:1px solid #24406b;
-      border-radius:10px; padding:10px 12px; backdrop-filter:blur(6px); }
-    #sidebar { top:12px; left:12px; width:250px; max-height:calc(100% - 24px); overflow:auto; }
-    #sidebar h1 { font-size:15px; margin:0 0 2px; }
-    #sidebar .sub { font-size:11px; color:#8fb3e0; margin-bottom:10px; }
-    .toggle { display:flex; align-items:center; gap:8px; margin:5px 0; font-size:13px; }
-    .toggle input { accent-color:var(--accent); }
-    .sites li { list-style:none; padding:4px 6px; border-radius:6px; cursor:pointer; }
-    .sites li:hover { background:#1b2c4d; }
-    .sites li .d { font-size:11px; color:#8fb3e0; }
-    .sites .unverified { opacity:.6; font-style:italic; }
-    ul { padding:0; margin:6px 0; }
-    #readout { bottom:12px; left:12px; font-variant-numeric:tabular-nums; }
-    #readout button { margin-top:6px; background:#12325c; color:#dfeaff;
-      border:1px solid #2e5a90; border-radius:6px; padding:4px 8px; cursor:pointer; font-size:12px; }
-    #exwrap { margin-top:8px; font-size:12px; }
+
+    .panel { position:absolute; background:var(--panel); border:1px solid var(--edge);
+      border-radius:var(--radius); padding:10px 12px; backdrop-filter:blur(6px); box-shadow:var(--shadow); }
+
+    /* ---- sidebar ---- */
+    #sidebar { top:12px; left:12px; width:256px; max-height:calc(100% - 24px);
+      overflow:auto; transition:transform .28s cubic-bezier(.4,0,.2,1), opacity .22s ease; }
+    #sidebar.collapsed { transform:translateX(-118%); opacity:0; pointer-events:none; }
+    .sb-head { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--sp-2); }
+    #sidebar h1 { font-size:var(--fs-lg); margin:0 0 2px; letter-spacing:.2px; }
+    #sidebar .sub { font-size:var(--fs-xs); color:var(--ink-dim); margin-bottom:var(--sp-3); }
+    .section-title { font-size:var(--fs-xs); text-transform:uppercase; letter-spacing:.09em;
+      color:var(--ink-faint); margin:var(--sp-3) 0 var(--sp-1); font-weight:600; }
+
+    .iconbtn { flex:none; width:26px; height:26px; display:grid; place-items:center;
+      background:transparent; color:var(--ink-dim); border:1px solid var(--edge);
+      border-radius:var(--radius-sm); cursor:pointer; padding:0; transition:.15s; }
+    .iconbtn:hover { color:var(--accent); border-color:var(--accent); background:#0f2138; }
+    .iconbtn svg { width:14px; height:14px; }
+
+    /* collapsed-state opener */
+    #sb-open { top:12px; left:12px; width:34px; height:34px; }
+
+    .toggle { display:flex; align-items:center; gap:var(--sp-2); margin:6px 0; font-size:var(--fs-md);
+      cursor:pointer; user-select:none; padding:2px 4px; border-radius:var(--radius-sm); transition:background .12s; }
+    .toggle:hover { background:var(--edge-soft); }
+    .toggle input { accent-color:var(--accent); width:15px; height:15px; margin:0; cursor:pointer; }
+    .toggle .sw { width:11px; height:11px; border-radius:3px; flex:none; box-shadow:0 0 0 1px #0006 inset; }
+
+    #exwrap { margin:2px 0 4px 26px; font-size:var(--fs-sm); color:var(--ink-dim); }
     #ex { width:100%; accent-color:var(--accent); }
-    .legend { bottom:12px; right:12px; width:150px; }
-    .legend .bar { height:10px; border-radius:3px; margin:4px 0;
-      background:linear-gradient(90deg,#050510,#001f7a,#0077ff,#00e5ff,#fff); }
-    .legend .row { display:flex; justify-content:space-between; font-size:11px; color:#8fb3e0; }
-    .maplibregl-popup-content { background:#0d1526; color:#dfeaff; border:1px solid #2e5a90;
-      border-radius:8px; font-size:13px; }
-    .maplibregl-popup-content button { background:#12325c; color:#dfeaff; border:1px solid #2e5a90;
-      border-radius:5px; padding:3px 7px; cursor:pointer; margin:2px 2px 0 0; font-size:12px; }
-    .maplibregl-popup-tip { border-top-color:#0d1526 !important; }
+
+    .sites { padding:0; margin:var(--sp-1) 0; }
+    .sites li { list-style:none; padding:5px 8px; border-radius:var(--radius-sm); cursor:pointer;
+      display:flex; justify-content:space-between; align-items:baseline; gap:6px; transition:background .12s; }
+    .sites li:hover { background:var(--edge-soft); }
+    .sites li .nm { border-left:2px solid var(--c-site); padding-left:7px; }
+    .sites li.unverified .nm { border-left-color:var(--c-site-unverified); opacity:.75; font-style:italic; }
+    .sites li .d { font-size:var(--fs-xs); color:var(--ink-dim); white-space:nowrap; }
+
+    .note { font-size:var(--fs-xs); color:var(--ink-faint); margin-top:var(--sp-2); line-height:1.35; }
+    .note code { color:var(--ink-dim); }
+
+    /* ---- admin ---- */
+    #admin-bar { margin-top:var(--sp-3); padding-top:var(--sp-2); border-top:1px solid var(--edge); }
+    .linkbtn { background:transparent; border:none; color:var(--ink-faint); cursor:pointer;
+      font-size:var(--fs-sm); padding:2px 0; display:inline-flex; align-items:center; gap:6px; }
+    .linkbtn:hover { color:var(--accent); }
+    .btn { background:#12325c; color:var(--ink); border:1px solid #2e5a90; border-radius:var(--radius-sm);
+      padding:5px 10px; cursor:pointer; font-size:var(--fs-sm); transition:.14s; }
+    .btn:hover { background:#17457c; border-color:var(--accent); }
+    .btn.primary { background:#0e3d4a; border-color:#1f6f82; }
+    .btn.primary:hover { background:#12566a; border-color:var(--accent); }
+    #admin-panel { margin-top:var(--sp-2); }
+    #admin-panel.hidden { display:none; }
+    .admin-list { max-height:210px; overflow:auto; border:1px solid var(--edge); border-radius:var(--radius-sm);
+      padding:4px; margin:var(--sp-1) 0; background:#0a1424; }
+    .arow { display:flex; align-items:center; gap:6px; padding:3px 4px; border-radius:4px; }
+    .arow:hover { background:var(--edge-soft); }
+    .arow input[type=text] { flex:1; min-width:0; background:#0d1b30; border:1px solid var(--edge);
+      color:var(--ink); border-radius:4px; padding:3px 6px; font-size:var(--fs-sm); }
+    .arow input[type=text]:focus { outline:none; border-color:var(--accent); }
+    .arow input[type=checkbox] { accent-color:var(--accent); }
+    .admin-actions { display:flex; gap:6px; flex-wrap:wrap; margin:var(--sp-1) 0 var(--sp-2); }
+
+    /* ---- readout ---- */
+    #readout { bottom:12px; left:12px; font-variant-numeric:tabular-nums; }
+    #readout .k { color:var(--ink-faint); font-size:var(--fs-xs); text-transform:uppercase; letter-spacing:.08em; }
+    #readout button { margin-top:6px; }
+
+    /* ---- legend ---- */
+    .legend { bottom:12px; right:12px; width:172px; }
+    .legend .lt { font-size:var(--fs-sm); font-weight:600; }
+    .legend .bar { height:11px; border-radius:3px; margin:6px 0 3px;
+      background:linear-gradient(90deg,
+        var(--depth-120) 0%, var(--depth-60) 50%, var(--depth-30) 75%,
+        var(--depth-10) 91.7%, var(--depth-0) 100%); box-shadow:0 0 0 1px #0006 inset; }
+    .legend .row { display:flex; justify-content:space-between; font-size:var(--fs-xs); color:var(--ink-dim); }
+    .legend .foot { font-size:10px; color:var(--ink-faint); margin-top:5px; line-height:1.3; }
+
+    /* ---- popups ---- */
+    .maplibregl-popup-content { background:var(--panel-solid); color:var(--ink); border:1px solid #2e5a90;
+      border-radius:var(--radius-sm); font-size:var(--fs-md); box-shadow:var(--shadow); padding:10px 12px; }
+    .maplibregl-popup-content b { color:#fff; }
+    .maplibregl-popup-content button { background:#12325c; color:var(--ink); border:1px solid #2e5a90;
+      border-radius:5px; padding:3px 7px; cursor:pointer; margin:4px 3px 0 0; font-size:var(--fs-sm); }
+    .maplibregl-popup-content button:hover { border-color:var(--accent); }
+    .maplibregl-popup-tip { border-top-color:var(--panel-solid) !important; }
+    .maplibregl-popup-close-button { color:var(--ink-dim); }
+
     a { color:var(--accent); }
-    .note { font-size:11px; color:#7e9bc4; margin-top:8px; }
   </style>
 </head>
 <body>
   <div id="map"></div>
 
+  <button id="sb-open" class="panel iconbtn" hidden title="Show panel" aria-label="Show panel">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+  </button>
+
   <div id="sidebar" class="panel">
-    <h1>Sodwana Bay Bathymetry</h1>
-    <div class="sub">Red Sands → Mabibi · free data · honest to ~3 m/px</div>
+    <div class="sb-head">
+      <div>
+        <h1>Sodwana Bay Bathymetry</h1>
+        <div class="sub">Red Sands → Mabibi · free data · honest to ~3 m/px</div>
+      </div>
+      <button id="sb-collapse" class="iconbtn" title="Hide panel" aria-label="Hide panel">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg>
+      </button>
+    </div>
 
-    <div class="toggle"><input type="checkbox" id="t-3d"><label for="t-3d">3D terrain</label></div>
-    <div id="exwrap">Exaggeration <span id="exval">1.6×</span>
+    <div class="section-title">Layers</div>
+    <div id="toggle-3d"></div>
+    <div id="exwrap" hidden>Exaggeration <span id="exval">1.6×</span>
       <input type="range" id="ex" min="1" max="3" step="0.1" value="1.6"></div>
-    <div class="toggle"><input type="checkbox" id="t-relief" checked><label for="t-relief">Depth colour</label></div>
-    <div class="toggle"><input type="checkbox" id="t-hill" checked><label for="t-hill">Hillshade</label></div>
-    <div class="toggle"><input type="checkbox" id="t-contour" checked><label for="t-contour">Contours</label></div>
-    <div class="toggle"><input type="checkbox" id="t-sites" checked><label for="t-sites">Dive sites</label></div>
-    <div class="toggle"><input type="checkbox" id="t-tracks"><label for="t-tracks">ICESat-2 tracks</label></div>
-    <div class="toggle"><input type="checkbox" id="t-prospects"><label for="t-prospects">Prospect leads</label></div>
-    <div class="toggle"><input type="checkbox" id="t-geology"><label for="t-geology">Seafloor geology (CGS)</label></div>
-    <div class="toggle"><input type="checkbox" id="t-isobaths"><label for="t-isobaths">CGS isobaths</label></div>
-    <div class="toggle"><input type="checkbox" id="t-entries"><label for="t-entries">Dive entry points</label></div>
-    <div class="toggle"><input type="checkbox" id="t-measure"><label for="t-measure">Measure distance</label></div>
+    <div id="toggles"></div>
 
-    <h1 style="font-size:13px;margin-top:12px">Reefs</h1>
+    <div class="section-title">Reefs &amp; dive sites</div>
     <ul id="site-list" class="sites"></ul>
     <div class="note" id="data-note"></div>
+
+    <div id="admin-bar">
+      <button id="admin-link" class="linkbtn" title="Site owner tools">
+        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+        Admin
+      </button>
+      <div id="admin-panel" class="hidden"></div>
+    </div>
   </div>
 
   <div id="readout" class="panel">
+    <div class="k">Cursor</div>
     <div id="cursor">lat —, lon —</div>
-    <div id="clicked" style="color:#8fb3e0">click the map to pin a coordinate</div>
-    <button id="copybtn" hidden>Copy coords</button>
+    <div id="clicked" style="color:var(--ink-dim);margin-top:4px">click the map to pin a coordinate</div>
+    <button id="copybtn" class="btn" hidden>Copy coords</button>
   </div>
 
   <div class="legend panel">
-    <div style="font-size:12px">Depth (m)</div>
+    <div class="lt">Depth (m)</div>
     <div class="bar"></div>
-    <div class="row"><span>-120</span><span>-30</span><span>0</span></div>
+    <div class="row"><span>−120</span><span>−60</span><span>0</span></div>
+    <div class="foot">Colour-relief DEM &amp; CGS isobaths share this blue→cyan depth scale. Land renders transparent.</div>
   </div>
 
   <script src="vendor/maplibre-gl.js"

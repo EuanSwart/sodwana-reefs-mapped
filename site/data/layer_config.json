@@ -1,0 +1,13 @@
+{
+  "3d": true,
+  "relief": true,
+  "hill": true,
+  "contour": true,
+  "sites": true,
+  "tracks": true,
+  "prospects": true,
+  "geology": true,
+  "isobaths": true,
+  "entries": true,
+  "measure": true
+}

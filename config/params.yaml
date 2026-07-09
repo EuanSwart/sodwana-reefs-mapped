@@ -76,8 +76,15 @@ fusion:
 
 # ---- CGS Council-for-Geoscience ingest (script 09) ----
 cgs:
-  simplify_deg: 0.00015        # web geojson geometry simplification (~15 m)
-  isobath_densify_deg: 0.0002  # ~20 m spacing when densifying contours into fusion points
+  # 2026-07-09: was 0.00015 (~15-17 m) -> visibly blocky at dive-site zoom. Measured native vertex
+  # spacing of the source gpkgs (see CLAUDE.md Gotchas): geology polygons median ~1.0 m/segment
+  # (p25 0.68 m, p75 1.67 m) -- the 2005 survey was digitized far finer than the old web tolerance.
+  # Isobaths are natively coarser (median ~21.6 m/segment) matching their own digitization. Chose
+  # 0.00002 (~2.0-2.2 m at -27.5 deg lat) as a single shared tolerance: close to the geology median
+  # so real reef-edge detail is kept, comfortably below the isobaths' native spacing so nothing is
+  # fabricated there either, and small enough that neither output threatens the 300 MB site budget.
+  simplify_deg: 0.00002        # web geojson geometry simplification (~2 m, was ~15 m)
+  isobath_densify_deg: 0.0002  # ~20 m spacing when densifying contours into fusion points -- matches isobaths' own native ~21.6 m median vertex spacing, left unchanged
   reef_classes: ["Reef", "Prominent Reef", "Scattered Reef"]
 
 # ---- Dive-log ingest (script 08) ----
