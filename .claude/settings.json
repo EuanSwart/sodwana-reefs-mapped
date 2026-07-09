@@ -1,0 +1,46 @@
+{
+  "$comment": "Sodwana bathymetry project hooks. Intent: (a) instant syntax/JSON gate on every pipeline or geojson edit; (b) auto-run quick validation whenever model/fusion scripts run; (c) BLOCK git push unless full validation + site smoke test pass (the deployment gate). Hook input arrives as JSON on stdin (tool_input.file_path / tool_input.command).",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=$(jq -r '.tool_input.file_path // empty'); case \"$f\" in *pipeline/*.py) python -m py_compile \"$f\" || exit 2;; *.geojson) python -c \"import json,sys;json.load(open(sys.argv[1]))\" \"$f\" || exit 2;; *.json) python -c \"import json,sys;json.load(open(sys.argv[1]))\" \"$f\" || exit 2;; esac"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "c=$(jq -r '.tool_input.command // empty'); echo \"$c\" | grep -qE 'pipeline/0[45]' && python pipeline/validate.py --quick || true"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "c=$(jq -r '.tool_input.command // empty'); if echo \"$c\" | grep -q 'git push'; then python pipeline/validate.py && python pipeline/smoke_site.py || { echo 'PUSH BLOCKED: validation or site smoke test failed' >&2; exit 2; }; fi"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"- [session $(date -u +%Y-%m-%dT%H:%MZ)] review pipeline output; append real discoveries here.\" >> CLAUDE.md"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,2012 @@
+{
+  "type": "FeatureCollection",
+  "name": "prospects",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.801077,
+          -27.375792
+        ]
+      },
+      "properties": {
+        "score": 10.0,
+        "mean_depth_m": -9.1,
+        "area_px": 17,
+        "km_from_known_site": 4.67,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 1
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.814188,
+          -27.377367
+        ]
+      },
+      "properties": {
+        "score": 10.0,
+        "mean_depth_m": -10.2,
+        "area_px": 16,
+        "km_from_known_site": 5.28,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 2
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.790713,
+          -27.398272
+        ]
+      },
+      "properties": {
+        "score": 10.0,
+        "mean_depth_m": -9.9,
+        "area_px": 15,
+        "km_from_known_site": 7.04,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 3
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.780882,
+          -27.50478
+        ]
+      },
+      "properties": {
+        "score": 10.0,
+        "mean_depth_m": -11.6,
+        "area_px": 18,
+        "km_from_known_site": 6.86,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 4
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.741269,
+          -27.509099
+        ]
+      },
+      "properties": {
+        "score": 10.0,
+        "mean_depth_m": -9.8,
+        "area_px": 31,
+        "km_from_known_site": 3.72,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 5
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.74324,
+          -27.513832
+        ]
+      },
+      "properties": {
+        "score": 10.0,
+        "mean_depth_m": -10.5,
+        "area_px": 12,
+        "km_from_known_site": 4.07,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 6
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.74378,
+          -27.51434
+        ]
+      },
+      "properties": {
+        "score": 10.0,
+        "mean_depth_m": -8.9,
+        "area_px": 40,
+        "km_from_known_site": 4.14,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 7
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.744727,
+          -27.518043
+        ]
+      },
+      "properties": {
+        "score": 10.0,
+        "mean_depth_m": -10.2,
+        "area_px": 21,
+        "km_from_known_site": 4.4,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 8
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.731683,
+          -27.524989
+        ]
+      },
+      "properties": {
+        "score": 10.0,
+        "mean_depth_m": -11.2,
+        "area_px": 17,
+        "km_from_known_site": 3.83,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 9
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.747284,
+          -27.515913
+        ]
+      },
+      "properties": {
+        "score": 7.52,
+        "mean_depth_m": -9.3,
+        "area_px": 12,
+        "km_from_known_site": 4.53,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 10
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.73322,
+          -27.518304
+        ]
+      },
+      "properties": {
+        "score": 7.48,
+        "mean_depth_m": -9.7,
+        "area_px": 25,
+        "km_from_known_site": 3.45,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 11
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.716336,
+          -27.516771
+        ]
+      },
+      "properties": {
+        "score": 6.12,
+        "mean_depth_m": -9.5,
+        "area_px": 14,
+        "km_from_known_site": 2.17,
+        "confidence": "lead CORROBORATED by CGS 'Reef' substrate; ground-truth before diving",
+        "cgs_substrate": "Reef",
+        "cgs_corroborated": true,
+        "rank": 12
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.747251,
+          -27.511602
+        ]
+      },
+      "properties": {
+        "score": 5.96,
+        "mean_depth_m": -8.5,
+        "area_px": 15,
+        "km_from_known_site": 4.36,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 13
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.746783,
+          -27.51635
+        ]
+      },
+      "properties": {
+        "score": 5.76,
+        "mean_depth_m": -9.5,
+        "area_px": 15,
+        "km_from_known_site": 4.5,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 14
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.746975,
+          -27.502464
+        ]
+      },
+      "properties": {
+        "score": 5.72,
+        "mean_depth_m": -9.3,
+        "area_px": 15,
+        "km_from_known_site": 4.05,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 15
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.729097,
+          -27.514513
+        ]
+      },
+      "properties": {
+        "score": 5.62,
+        "mean_depth_m": -8.8,
+        "area_px": 12,
+        "km_from_known_site": 2.87,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 16
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.772778,
+          -27.530868
+        ]
+      },
+      "properties": {
+        "score": 5.54,
+        "mean_depth_m": -11.1,
+        "area_px": 12,
+        "km_from_known_site": 7.51,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 17
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.738621,
+          -27.514274
+        ]
+      },
+      "properties": {
+        "score": 5.51,
+        "mean_depth_m": -9.1,
+        "area_px": 12,
+        "km_from_known_site": 3.68,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 18
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.794556,
+          -27.384558
+        ]
+      },
+      "properties": {
+        "score": 5.5,
+        "mean_depth_m": -8.2,
+        "area_px": 16,
+        "km_from_known_site": 5.53,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 19
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.745043,
+          -27.516339
+        ]
+      },
+      "properties": {
+        "score": 5.31,
+        "mean_depth_m": -9.6,
+        "area_px": 22,
+        "km_from_known_site": 4.35,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 20
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.728311,
+          -27.504142
+        ]
+      },
+      "properties": {
+        "score": 5.13,
+        "mean_depth_m": -9.2,
+        "area_px": 13,
+        "km_from_known_site": 2.34,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 21
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.737835,
+          -27.516386
+        ]
+      },
+      "properties": {
+        "score": 5.06,
+        "mean_depth_m": -9.0,
+        "area_px": 14,
+        "km_from_known_site": 3.72,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 22
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.754558,
+          -27.516274
+        ]
+      },
+      "properties": {
+        "score": 4.93,
+        "mean_depth_m": -10.1,
+        "area_px": 16,
+        "km_from_known_site": 5.21,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 23
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.742465,
+          -27.51425
+        ]
+      },
+      "properties": {
+        "score": 4.92,
+        "mean_depth_m": -8.9,
+        "area_px": 13,
+        "km_from_known_site": 4.02,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 24
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.779471,
+          -27.325277
+        ]
+      },
+      "properties": {
+        "score": 4.86,
+        "mean_depth_m": -7.8,
+        "area_px": 12,
+        "km_from_known_site": 1.5,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 25
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.75884,
+          -27.490133
+        ]
+      },
+      "properties": {
+        "score": 4.86,
+        "mean_depth_m": -10.9,
+        "area_px": 14,
+        "km_from_known_site": 4.18,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 26
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.804653,
+          -27.382567
+        ]
+      },
+      "properties": {
+        "score": 4.83,
+        "mean_depth_m": -8.7,
+        "area_px": 13,
+        "km_from_known_site": 5.48,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 27
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.74578,
+          -27.515592
+        ]
+      },
+      "properties": {
+        "score": 4.82,
+        "mean_depth_m": -9.9,
+        "area_px": 23,
+        "km_from_known_site": 4.38,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 28
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.716193,
+          -27.515045
+        ]
+      },
+      "properties": {
+        "score": 4.81,
+        "mean_depth_m": -9.9,
+        "area_px": 15,
+        "km_from_known_site": 2.0,
+        "confidence": "lead CORROBORATED by CGS 'Reef' substrate; ground-truth before diving",
+        "cgs_substrate": "Reef",
+        "cgs_corroborated": true,
+        "rank": 29
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.745885,
+          -27.513349
+        ]
+      },
+      "properties": {
+        "score": 4.8,
+        "mean_depth_m": -9.3,
+        "area_px": 25,
+        "km_from_known_site": 4.3,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 30
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.751626,
+          -27.51627
+        ]
+      },
+      "properties": {
+        "score": 4.76,
+        "mean_depth_m": -10.4,
+        "area_px": 14,
+        "km_from_known_site": 4.94,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 31
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.743661,
+          -27.513407
+        ]
+      },
+      "properties": {
+        "score": 4.73,
+        "mean_depth_m": -8.8,
+        "area_px": 13,
+        "km_from_known_site": 4.09,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 32
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.746468,
+          -27.519169
+        ]
+      },
+      "properties": {
+        "score": 4.73,
+        "mean_depth_m": -10.1,
+        "area_px": 12,
+        "km_from_known_site": 4.61,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 33
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.778311,
+          -27.321238
+        ]
+      },
+      "properties": {
+        "score": 4.68,
+        "mean_depth_m": -8.8,
+        "area_px": 18,
+        "km_from_known_site": 1.92,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 34
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.745544,
+          -27.502555
+        ]
+      },
+      "properties": {
+        "score": 4.68,
+        "mean_depth_m": -9.5,
+        "area_px": 20,
+        "km_from_known_site": 3.97,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 35
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.779923,
+          -27.49024
+        ]
+      },
+      "properties": {
+        "score": 4.67,
+        "mean_depth_m": -10.7,
+        "area_px": 18,
+        "km_from_known_site": 5.92,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 36
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.725338,
+          -27.501991
+        ]
+      },
+      "properties": {
+        "score": 4.66,
+        "mean_depth_m": -9.9,
+        "area_px": 12,
+        "km_from_known_site": 2.02,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 37
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.800482,
+          -27.320763
+        ]
+      },
+      "properties": {
+        "score": 4.64,
+        "mean_depth_m": -7.4,
+        "area_px": 15,
+        "km_from_known_site": 1.89,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 38
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.737086,
+          -27.526587
+        ]
+      },
+      "properties": {
+        "score": 4.64,
+        "mean_depth_m": -10.3,
+        "area_px": 12,
+        "km_from_known_site": 4.33,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 39
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.733522,
+          -27.522455
+        ]
+      },
+      "properties": {
+        "score": 4.63,
+        "mean_depth_m": -9.5,
+        "area_px": 18,
+        "km_from_known_site": 3.76,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 40
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.728891,
+          -27.526038
+        ]
+      },
+      "properties": {
+        "score": 4.63,
+        "mean_depth_m": -10.2,
+        "area_px": 13,
+        "km_from_known_site": 3.73,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 41
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.71799,
+          -27.504991
+        ]
+      },
+      "properties": {
+        "score": 4.62,
+        "mean_depth_m": -10.4,
+        "area_px": 15,
+        "km_from_known_site": 1.4,
+        "confidence": "lead CORROBORATED by CGS 'Reef' substrate; ground-truth before diving",
+        "cgs_substrate": "Reef",
+        "cgs_corroborated": true,
+        "rank": 42
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.714115,
+          -27.520973
+        ]
+      },
+      "properties": {
+        "score": 4.6,
+        "mean_depth_m": -10.0,
+        "area_px": 12,
+        "km_from_known_site": 2.5,
+        "confidence": "lead CORROBORATED by CGS 'Reef' substrate; ground-truth before diving",
+        "cgs_substrate": "Reef",
+        "cgs_corroborated": true,
+        "rank": 43
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.735959,
+          -27.528013
+        ]
+      },
+      "properties": {
+        "score": 4.59,
+        "mean_depth_m": -10.2,
+        "area_px": 16,
+        "km_from_known_site": 4.36,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 44
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.735414,
+          -27.514695
+        ]
+      },
+      "properties": {
+        "score": 4.58,
+        "mean_depth_m": -10.0,
+        "area_px": 19,
+        "km_from_known_site": 3.42,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 45
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.734791,
+          -27.518071
+        ]
+      },
+      "properties": {
+        "score": 4.56,
+        "mean_depth_m": -9.1,
+        "area_px": 16,
+        "km_from_known_site": 3.56,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 46
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.781667,
+          -27.502521
+        ]
+      },
+      "properties": {
+        "score": 4.54,
+        "mean_depth_m": -11.4,
+        "area_px": 21,
+        "km_from_known_site": 6.81,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 47
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.735646,
+          -27.513633
+        ]
+      },
+      "properties": {
+        "score": 4.51,
+        "mean_depth_m": -9.5,
+        "area_px": 14,
+        "km_from_known_site": 3.38,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 48
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.732107,
+          -27.499753
+        ]
+      },
+      "properties": {
+        "score": 4.5,
+        "mean_depth_m": -10.5,
+        "area_px": 12,
+        "km_from_known_site": 2.67,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 49
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.810386,
+          -27.32131
+        ]
+      },
+      "properties": {
+        "score": 4.48,
+        "mean_depth_m": -8.0,
+        "area_px": 12,
+        "km_from_known_site": 2.52,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 50
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.786622,
+          -27.345344
+        ]
+      },
+      "properties": {
+        "score": 4.42,
+        "mean_depth_m": -8.5,
+        "area_px": 12,
+        "km_from_known_site": 1.2,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 51
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.731539,
+          -27.505473
+        ]
+      },
+      "properties": {
+        "score": 4.4,
+        "mean_depth_m": -10.0,
+        "area_px": 14,
+        "km_from_known_site": 2.69,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 52
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.71708,
+          -27.516989
+        ]
+      },
+      "properties": {
+        "score": 4.38,
+        "mean_depth_m": -10.6,
+        "area_px": 14,
+        "km_from_known_site": 2.23,
+        "confidence": "lead CORROBORATED by CGS 'Reef' substrate; ground-truth before diving",
+        "cgs_substrate": "Reef",
+        "cgs_corroborated": true,
+        "rank": 53
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.740344,
+          -27.516123
+        ]
+      },
+      "properties": {
+        "score": 4.35,
+        "mean_depth_m": -9.5,
+        "area_px": 14,
+        "km_from_known_site": 3.92,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 54
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.793844,
+          -27.385116
+        ]
+      },
+      "properties": {
+        "score": 4.33,
+        "mean_depth_m": -8.8,
+        "area_px": 13,
+        "km_from_known_site": 5.59,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 55
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.757332,
+          -27.516488
+        ]
+      },
+      "properties": {
+        "score": 4.33,
+        "mean_depth_m": -11.3,
+        "area_px": 14,
+        "km_from_known_site": 5.48,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 56
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.741715,
+          -27.515289
+        ]
+      },
+      "properties": {
+        "score": 4.31,
+        "mean_depth_m": -9.6,
+        "area_px": 21,
+        "km_from_known_site": 4.0,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 57
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.804103,
+          -27.332614
+        ]
+      },
+      "properties": {
+        "score": 4.29,
+        "mean_depth_m": -7.0,
+        "area_px": 16,
+        "km_from_known_site": 1.42,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 58
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.742872,
+          -27.509966
+        ]
+      },
+      "properties": {
+        "score": 4.29,
+        "mean_depth_m": -9.2,
+        "area_px": 31,
+        "km_from_known_site": 3.9,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 59
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.763783,
+          -27.334192
+        ]
+      },
+      "properties": {
+        "score": 4.28,
+        "mean_depth_m": -10.4,
+        "area_px": 20,
+        "km_from_known_site": 2.59,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 60
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.780037,
+          -27.345541
+        ]
+      },
+      "properties": {
+        "score": 4.28,
+        "mean_depth_m": -8.6,
+        "area_px": 14,
+        "km_from_known_site": 1.53,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 61
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.794219,
+          -27.398116
+        ]
+      },
+      "properties": {
+        "score": 4.28,
+        "mean_depth_m": -9.3,
+        "area_px": 16,
+        "km_from_known_site": 7.03,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 62
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.725277,
+          -27.51689
+        ]
+      },
+      "properties": {
+        "score": 4.28,
+        "mean_depth_m": -9.4,
+        "area_px": 13,
+        "km_from_known_site": 2.74,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 63
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.741779,
+          -27.508735
+        ]
+      },
+      "properties": {
+        "score": 4.25,
+        "mean_depth_m": -9.1,
+        "area_px": 20,
+        "km_from_known_site": 3.76,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 64
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.75239,
+          -27.520032
+        ]
+      },
+      "properties": {
+        "score": 4.24,
+        "mean_depth_m": -10.6,
+        "area_px": 19,
+        "km_from_known_site": 5.18,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 65
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.782628,
+          -27.331297
+        ]
+      },
+      "properties": {
+        "score": 4.23,
+        "mean_depth_m": -8.0,
+        "area_px": 22,
+        "km_from_known_site": 0.84,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 66
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.748538,
+          -27.519195
+        ]
+      },
+      "properties": {
+        "score": 4.23,
+        "mean_depth_m": -10.3,
+        "area_px": 15,
+        "km_from_known_site": 4.8,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 67
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.791964,
+          -27.372887
+        ]
+      },
+      "properties": {
+        "score": 4.22,
+        "mean_depth_m": -9.4,
+        "area_px": 13,
+        "km_from_known_site": 4.22,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 68
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.800516,
+          -27.380499
+        ]
+      },
+      "properties": {
+        "score": 4.2,
+        "mean_depth_m": -8.5,
+        "area_px": 17,
+        "km_from_known_site": 5.16,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 69
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.808904,
+          -27.346849
+        ]
+      },
+      "properties": {
+        "score": 4.18,
+        "mean_depth_m": -8.8,
+        "area_px": 12,
+        "km_from_known_site": 2.29,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 70
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.780742,
+          -27.432814
+        ]
+      },
+      "properties": {
+        "score": 4.18,
+        "mean_depth_m": -9.3,
+        "area_px": 16,
+        "km_from_known_site": 5.14,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 71
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.810296,
+          -27.373787
+        ]
+      },
+      "properties": {
+        "score": 4.17,
+        "mean_depth_m": -9.1,
+        "area_px": 12,
+        "km_from_known_site": 4.76,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 72
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.79947,
+          -27.379641
+        ]
+      },
+      "properties": {
+        "score": 4.14,
+        "mean_depth_m": -9.2,
+        "area_px": 12,
+        "km_from_known_site": 5.05,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 73
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.744248,
+          -27.523005
+        ]
+      },
+      "properties": {
+        "score": 4.13,
+        "mean_depth_m": -10.6,
+        "area_px": 16,
+        "km_from_known_site": 4.64,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 74
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.741454,
+          -27.513802
+        ]
+      },
+      "properties": {
+        "score": 4.09,
+        "mean_depth_m": -9.3,
+        "area_px": 18,
+        "km_from_known_site": 3.91,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 75
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.739404,
+          -27.517829
+        ]
+      },
+      "properties": {
+        "score": 4.09,
+        "mean_depth_m": -9.3,
+        "area_px": 17,
+        "km_from_known_site": 3.93,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 76
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.741908,
+          -27.521059
+        ]
+      },
+      "properties": {
+        "score": 4.07,
+        "mean_depth_m": -10.3,
+        "area_px": 24,
+        "km_from_known_site": 4.33,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 77
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.778837,
+          -27.333529
+        ]
+      },
+      "properties": {
+        "score": 4.06,
+        "mean_depth_m": -8.1,
+        "area_px": 17,
+        "km_from_known_site": 1.11,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 78
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.779389,
+          -27.516692
+        ]
+      },
+      "properties": {
+        "score": 4.06,
+        "mean_depth_m": -11.5,
+        "area_px": 12,
+        "km_from_known_site": 7.47,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 79
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.730916,
+          -27.488513
+        ]
+      },
+      "properties": {
+        "score": 4.05,
+        "mean_depth_m": -10.5,
+        "area_px": 13,
+        "km_from_known_site": 1.85,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 80
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.790506,
+          -27.3235
+        ]
+      },
+      "properties": {
+        "score": 4.04,
+        "mean_depth_m": -8.2,
+        "area_px": 13,
+        "km_from_known_site": 1.28,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 81
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.725083,
+          -27.506084
+        ]
+      },
+      "properties": {
+        "score": 4.03,
+        "mean_depth_m": -9.8,
+        "area_px": 13,
+        "km_from_known_site": 2.09,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 82
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.743611,
+          -27.51237
+        ]
+      },
+      "properties": {
+        "score": 4.03,
+        "mean_depth_m": -9.1,
+        "area_px": 14,
+        "km_from_known_site": 4.05,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 83
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.779485,
+          -27.333871
+        ]
+      },
+      "properties": {
+        "score": 4.01,
+        "mean_depth_m": -8.0,
+        "area_px": 14,
+        "km_from_known_site": 1.05,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 84
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.731765,
+          -27.517457
+        ]
+      },
+      "properties": {
+        "score": 4.01,
+        "mean_depth_m": -9.6,
+        "area_px": 20,
+        "km_from_known_site": 3.28,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 85
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.742667,
+          -27.518343
+        ]
+      },
+      "properties": {
+        "score": 3.99,
+        "mean_depth_m": -10.0,
+        "area_px": 14,
+        "km_from_known_site": 4.24,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 86
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.742086,
+          -27.502976
+        ]
+      },
+      "properties": {
+        "score": 3.98,
+        "mean_depth_m": -10.3,
+        "area_px": 19,
+        "km_from_known_site": 3.67,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 87
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.759101,
+          -27.520731
+        ]
+      },
+      "properties": {
+        "score": 3.97,
+        "mean_depth_m": -11.4,
+        "area_px": 13,
+        "km_from_known_site": 5.81,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 88
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.747329,
+          -27.523608
+        ]
+      },
+      "properties": {
+        "score": 3.97,
+        "mean_depth_m": -11.1,
+        "area_px": 15,
+        "km_from_known_site": 4.93,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 89
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.783246,
+          -27.567121
+        ]
+      },
+      "properties": {
+        "score": 3.96,
+        "mean_depth_m": -11.5,
+        "area_px": 14,
+        "km_from_known_site": 10.01,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 90
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.744354,
+          -27.504873
+        ]
+      },
+      "properties": {
+        "score": 3.95,
+        "mean_depth_m": -10.0,
+        "area_px": 16,
+        "km_from_known_site": 3.92,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 91
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.802817,
+          -27.382388
+        ]
+      },
+      "properties": {
+        "score": 3.93,
+        "mean_depth_m": -8.8,
+        "area_px": 12,
+        "km_from_known_site": 5.42,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 92
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.785108,
+          -27.386104
+        ]
+      },
+      "properties": {
+        "score": 3.93,
+        "mean_depth_m": -10.0,
+        "area_px": 13,
+        "km_from_known_site": 5.7,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 93
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.737558,
+          -27.518418
+        ]
+      },
+      "properties": {
+        "score": 3.92,
+        "mean_depth_m": -9.6,
+        "area_px": 27,
+        "km_from_known_site": 3.81,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 94
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.801678,
+          -27.382297
+        ]
+      },
+      "properties": {
+        "score": 3.9,
+        "mean_depth_m": -9.1,
+        "area_px": 14,
+        "km_from_known_site": 5.38,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 95
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.753341,
+          -27.51393
+        ]
+      },
+      "properties": {
+        "score": 3.9,
+        "mean_depth_m": -10.6,
+        "area_px": 12,
+        "km_from_known_site": 5.01,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 96
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.74401,
+          -27.51818
+        ]
+      },
+      "properties": {
+        "score": 3.89,
+        "mean_depth_m": -10.1,
+        "area_px": 30,
+        "km_from_known_site": 4.35,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 97
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.781935,
+          -27.326512
+        ]
+      },
+      "properties": {
+        "score": 3.88,
+        "mean_depth_m": -7.8,
+        "area_px": 12,
+        "km_from_known_site": 1.24,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 98
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.762674,
+          -27.346887
+        ]
+      },
+      "properties": {
+        "score": 3.88,
+        "mean_depth_m": -8.6,
+        "area_px": 13,
+        "km_from_known_site": 3.01,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 99
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.745287,
+          -27.511821
+        ]
+      },
+      "properties": {
+        "score": 3.88,
+        "mean_depth_m": -9.6,
+        "area_px": 18,
+        "km_from_known_site": 4.19,
+        "confidence": "lead \u2014 high rugosity+BPI, unverified; ground-truth before diving",
+        "cgs_substrate": "unknown",
+        "cgs_corroborated": false,
+        "rank": 100
+      }
+    }
+  ]
+}

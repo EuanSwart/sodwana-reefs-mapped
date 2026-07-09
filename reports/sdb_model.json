@@ -1,0 +1,16 @@
+{
+  "model": "xgboost",
+  "features": [
+    "ln_B1",
+    "ln_B2",
+    "ln_B3",
+    "ln_B4",
+    "B8",
+    "ratio_B2_B3",
+    "ratio_B2_B4"
+  ],
+  "n_train": 4572,
+  "n_tracks": 51,
+  "optical_limit_m": -26.0,
+  "stumpf_coef": 29.815578886500006
+}

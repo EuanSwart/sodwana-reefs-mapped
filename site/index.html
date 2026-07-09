@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Sodwana Bay Bathymetry — Red Sands → Mabibi</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Free, high-resolution interactive seafloor map of Sodwana Bay for scuba training and reef prospecting. No API keys." />
+  <!-- Vendored-first, CDN fallback. Drop maplibre-gl.js/.css + maplibre-contour into site/vendor/ for full offline use. -->
+  <link href="vendor/maplibre-gl.css" rel="stylesheet"
+        onerror="this.onerror=null;this.href='https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css';" />
+  <style>
+    :root { --panel:#0d1526e6; --edge:#24406b; --accent:#00e5ff; }
+    html,body { margin:0; height:100%; background:#0a0f1c; color:#dfeaff;
+      font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
+    #map { position:absolute; inset:0; }
+    .panel { position:absolute; background:#0d1526e6; border:1px solid #24406b;
+      border-radius:10px; padding:10px 12px; backdrop-filter:blur(6px); }
+    #sidebar { top:12px; left:12px; width:250px; max-height:calc(100% - 24px); overflow:auto; }
+    #sidebar h1 { font-size:15px; margin:0 0 2px; }
+    #sidebar .sub { font-size:11px; color:#8fb3e0; margin-bottom:10px; }
+    .toggle { display:flex; align-items:center; gap:8px; margin:5px 0; font-size:13px; }
+    .toggle input { accent-color:var(--accent); }
+    .sites li { list-style:none; padding:4px 6px; border-radius:6px; cursor:pointer; }
+    .sites li:hover { background:#1b2c4d; }
+    .sites li .d { font-size:11px; color:#8fb3e0; }
+    .sites .unverified { opacity:.6; font-style:italic; }
+    ul { padding:0; margin:6px 0; }
+    #readout { bottom:12px; left:12px; font-variant-numeric:tabular-nums; }
+    #readout button { margin-top:6px; background:#12325c; color:#dfeaff;
+      border:1px solid #2e5a90; border-radius:6px; padding:4px 8px; cursor:pointer; font-size:12px; }
+    #exwrap { margin-top:8px; font-size:12px; }
+    #ex { width:100%; accent-color:var(--accent); }
+    .legend { bottom:12px; right:12px; width:150px; }
+    .legend .bar { height:10px; border-radius:3px; margin:4px 0;
+      background:linear-gradient(90deg,#050510,#001f7a,#0077ff,#00e5ff,#fff); }
+    .legend .row { display:flex; justify-content:space-between; font-size:11px; color:#8fb3e0; }
+    .maplibregl-popup-content { background:#0d1526; color:#dfeaff; border:1px solid #2e5a90;
+      border-radius:8px; font-size:13px; }
+    .maplibregl-popup-content button { background:#12325c; color:#dfeaff; border:1px solid #2e5a90;
+      border-radius:5px; padding:3px 7px; cursor:pointer; margin:2px 2px 0 0; font-size:12px; }
+    .maplibregl-popup-tip { border-top-color:#0d1526 !important; }
+    a { color:var(--accent); }
+    .note { font-size:11px; color:#7e9bc4; margin-top:8px; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <div id="sidebar" class="panel">
+    <h1>Sodwana Bay Bathymetry</h1>
+    <div class="sub">Red Sands → Mabibi · free data · honest to ~3 m/px</div>
+
+    <div class="toggle"><input type="checkbox" id="t-3d"><label for="t-3d">3D terrain</label></div>
+    <div id="exwrap">Exaggeration <span id="exval">1.6×</span>
+      <input type="range" id="ex" min="1" max="3" step="0.1" value="1.6"></div>
+    <div class="toggle"><input type="checkbox" id="t-relief" checked><label for="t-relief">Depth colour</label></div>
+    <div class="toggle"><input type="checkbox" id="t-hill" checked><label for="t-hill">Hillshade</label></div>
+    <div class="toggle"><input type="checkbox" id="t-contour" checked><label for="t-contour">Contours</label></div>
+    <div class="toggle"><input type="checkbox" id="t-sites" checked><label for="t-sites">Dive sites</label></div>
+    <div class="toggle"><input type="checkbox" id="t-tracks"><label for="t-tracks">ICESat-2 tracks</label></div>
+    <div class="toggle"><input type="checkbox" id="t-prospects"><label for="t-prospects">Prospect leads</label></div>
+    <div class="toggle"><input type="checkbox" id="t-geology"><label for="t-geology">Seafloor geology (CGS)</label></div>
+    <div class="toggle"><input type="checkbox" id="t-isobaths"><label for="t-isobaths">CGS isobaths</label></div>
+    <div class="toggle"><input type="checkbox" id="t-entries"><label for="t-entries">Dive entry points</label></div>
+    <div class="toggle"><input type="checkbox" id="t-measure"><label for="t-measure">Measure distance</label></div>
+
+    <h1 style="font-size:13px;margin-top:12px">Reefs</h1>
+    <ul id="site-list" class="sites"></ul>
+    <div class="note" id="data-note"></div>
+  </div>
+
+  <div id="readout" class="panel">
+    <div id="cursor">lat —, lon —</div>
+    <div id="clicked" style="color:#8fb3e0">click the map to pin a coordinate</div>
+    <button id="copybtn" hidden>Copy coords</button>
+  </div>
+
+  <div class="legend panel">
+    <div style="font-size:12px">Depth (m)</div>
+    <div class="bar"></div>
+    <div class="row"><span>-120</span><span>-30</span><span>0</span></div>
+  </div>
+
+  <script src="vendor/maplibre-gl.js"
+    onerror="var s=document.createElement('script');s.src='https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js';s.onload=function(){window.__mlReady&&window.__mlReady()};document.head.appendChild(s);"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

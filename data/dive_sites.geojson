@@ -1,0 +1,733 @@
+{
+  "type": "FeatureCollection",
+  "name": "sodwana_dive_sites",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+    }
+  },
+  "_note": "From Euan's Garmin dive logs (cleaned/clustered). Named clusters = verified.",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.728189,
+          -27.413715
+        ]
+      },
+      "properties": {
+        "name": "9 Mile",
+        "depth_min_m": -19.3,
+        "depth_max_m": -19.3,
+        "n_dives": 1,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "9 Mile: ~19 m max, from 1 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.713721,
+          -27.44329
+        ]
+      },
+      "properties": {
+        "name": "Ramsey",
+        "depth_min_m": -20.4,
+        "depth_max_m": -20.4,
+        "n_dives": 1,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Ramsey: ~20 m max, from 1 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.711859,
+          -27.451086
+        ]
+      },
+      "properties": {
+        "name": "7 Mile",
+        "depth_min_m": -24.2,
+        "depth_max_m": -23.0,
+        "n_dives": 2,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "7 Mile: ~24 m max, from 2 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.711454,
+          -27.451831
+        ]
+      },
+      "properties": {
+        "name": "7 Mile",
+        "depth_min_m": -21.1,
+        "depth_max_m": -21.1,
+        "n_dives": 1,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "7 Mile: ~21 m max, from 1 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.711376,
+          -27.45282
+        ]
+      },
+      "properties": {
+        "name": "7 Mile",
+        "depth_min_m": -22.5,
+        "depth_max_m": -22.2,
+        "n_dives": 2,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "7 Mile: ~22 m max, from 2 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.707695,
+          -27.46263
+        ]
+      },
+      "properties": {
+        "name": "Snappers College",
+        "depth_min_m": -24.1,
+        "depth_max_m": -24.1,
+        "n_dives": 1,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Snappers College: ~24 m max, from 1 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.70747,
+          -27.463077
+        ]
+      },
+      "properties": {
+        "name": "Snappers College",
+        "depth_min_m": -23.3,
+        "depth_max_m": -23.3,
+        "n_dives": 1,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Snappers College: ~23 m max, from 1 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.693051,
+          -27.491792
+        ]
+      },
+      "properties": {
+        "name": "UNNAMED",
+        "depth_min_m": -20.0,
+        "depth_max_m": -20.0,
+        "n_dives": 1,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": false,
+        "description": "UNNAMED: ~20 m max, from 1 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.703356,
+          -27.49233
+        ]
+      },
+      "properties": {
+        "name": "Gotham",
+        "depth_min_m": -40.2,
+        "depth_max_m": -40.2,
+        "n_dives": 1,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Gotham: ~40 m max, from 1 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.702858,
+          -27.492657
+        ]
+      },
+      "properties": {
+        "name": "Gotham",
+        "depth_min_m": -38.6,
+        "depth_max_m": -38.6,
+        "n_dives": 1,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Gotham: ~39 m max, from 1 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.706305,
+          -27.492959
+        ]
+      },
+      "properties": {
+        "name": "Deep Blue",
+        "depth_min_m": -33.0,
+        "depth_max_m": -33.0,
+        "n_dives": 1,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Deep Blue: ~33 m max, from 1 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.699302,
+          -27.496809
+        ]
+      },
+      "properties": {
+        "name": "Lettuce",
+        "depth_min_m": -31.0,
+        "depth_max_m": -28.7,
+        "n_dives": 5,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Lettuce: ~31 m max, from 5 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.696034,
+          -27.498631
+        ]
+      },
+      "properties": {
+        "name": "Hotspot",
+        "depth_min_m": -30.5,
+        "depth_max_m": -30.5,
+        "n_dives": 1,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Hotspot: ~30 m max, from 1 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.695825,
+          -27.510782
+        ]
+      },
+      "properties": {
+        "name": "Hotspot",
+        "depth_min_m": -31.7,
+        "depth_max_m": -25.4,
+        "n_dives": 13,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Hotspot: ~32 m max, from 13 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.694313,
+          -27.511869
+        ]
+      },
+      "properties": {
+        "name": "Hotspot 2",
+        "depth_min_m": -28.6,
+        "depth_max_m": -27.4,
+        "n_dives": 2,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Hotspot 2: ~29 m max, from 2 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.690026,
+          -27.517712
+        ]
+      },
+      "properties": {
+        "name": "Simons Cave",
+        "depth_min_m": -15.4,
+        "depth_max_m": -15.4,
+        "n_dives": 1,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Simons Cave: ~15 m max, from 1 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.688364,
+          -27.517932
+        ]
+      },
+      "properties": {
+        "name": "Wayne's World",
+        "depth_min_m": -20.3,
+        "depth_max_m": -20.3,
+        "n_dives": 1,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Wayne's World: ~20 m max, from 1 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.687719,
+          -27.518014
+        ]
+      },
+      "properties": {
+        "name": "Wayne's World",
+        "depth_min_m": -14.6,
+        "depth_max_m": -14.6,
+        "n_dives": 1,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Wayne's World: ~15 m max, from 1 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.686475,
+          -27.519221
+        ]
+      },
+      "properties": {
+        "name": "Pinnacles",
+        "depth_min_m": -13.2,
+        "depth_max_m": -12.0,
+        "n_dives": 4,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Pinnacles: ~13 m max, from 4 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.686798,
+          -27.520811
+        ]
+      },
+      "properties": {
+        "name": "4 Buoy",
+        "depth_min_m": -16.3,
+        "depth_max_m": -12.7,
+        "n_dives": 6,
+        "alt_names": "Pinnacles",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "4 Buoy: ~16 m max, from 6 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.685916,
+          -27.521129
+        ]
+      },
+      "properties": {
+        "name": "UNNAMED",
+        "depth_min_m": -13.6,
+        "depth_max_m": -13.6,
+        "n_dives": 1,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": false,
+        "description": "UNNAMED: ~14 m max, from 1 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.686264,
+          -27.522147
+        ]
+      },
+      "properties": {
+        "name": "Arches",
+        "depth_min_m": -18.2,
+        "depth_max_m": -12.5,
+        "n_dives": 5,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Arches: ~18 m max, from 5 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.68877,
+          -27.524175
+        ]
+      },
+      "properties": {
+        "name": "UNNAMED",
+        "depth_min_m": -17.8,
+        "depth_max_m": -17.8,
+        "n_dives": 1,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": false,
+        "description": "UNNAMED: ~18 m max, from 1 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.685219,
+          -27.526255
+        ]
+      },
+      "properties": {
+        "name": "Caves",
+        "depth_min_m": -16.3,
+        "depth_max_m": -13.9,
+        "n_dives": 4,
+        "alt_names": "2 Buoy",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Caves: ~16 m max, from 4 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.686236,
+          -27.52667
+        ]
+      },
+      "properties": {
+        "name": "2 Buoy",
+        "depth_min_m": -16.9,
+        "depth_max_m": -14.4,
+        "n_dives": 4,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "2 Buoy: ~17 m max, from 4 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.685664,
+          -27.527084
+        ]
+      },
+      "properties": {
+        "name": "2 Buoy",
+        "depth_min_m": -16.3,
+        "depth_max_m": -16.3,
+        "n_dives": 1,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "2 Buoy: ~16 m max, from 1 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.684687,
+          -27.52739
+        ]
+      },
+      "properties": {
+        "name": "Antons",
+        "depth_min_m": -16.9,
+        "depth_max_m": -16.1,
+        "n_dives": 2,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Antons: ~17 m max, from 2 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.685336,
+          -27.527498
+        ]
+      },
+      "properties": {
+        "name": "Southern Chain",
+        "depth_min_m": -17.5,
+        "depth_max_m": -17.5,
+        "n_dives": 1,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Southern Chain: ~18 m max, from 1 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.689346,
+          -27.527638
+        ]
+      },
+      "properties": {
+        "name": "Bikini",
+        "depth_min_m": -23.1,
+        "depth_max_m": -20.6,
+        "n_dives": 9,
+        "alt_names": "Hopscotch",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Bikini: ~23 m max, from 9 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.691752,
+          -27.527734
+        ]
+      },
+      "properties": {
+        "name": "Roonies",
+        "depth_min_m": -31.4,
+        "depth_max_m": -29.8,
+        "n_dives": 2,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Roonies: ~31 m max, from 2 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.684781,
+          -27.527902
+        ]
+      },
+      "properties": {
+        "name": "Antons",
+        "depth_min_m": -17.2,
+        "depth_max_m": -17.2,
+        "n_dives": 1,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Antons: ~17 m max, from 1 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.688233,
+          -27.529253
+        ]
+      },
+      "properties": {
+        "name": "Mellow Yellow",
+        "depth_min_m": -20.4,
+        "depth_max_m": -18.8,
+        "n_dives": 6,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Mellow Yellow: ~20 m max, from 6 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.682793,
+          -27.529596
+        ]
+      },
+      "properties": {
+        "name": "Stringer",
+        "depth_min_m": -14.8,
+        "depth_max_m": -13.0,
+        "n_dives": 2,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Stringer: ~15 m max, from 2 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.687129,
+          -27.531587
+        ]
+      },
+      "properties": {
+        "name": "Mellow Yellow",
+        "depth_min_m": -19.0,
+        "depth_max_m": -19.0,
+        "n_dives": 1,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Mellow Yellow: ~19 m max, from 1 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.684892,
+          -27.532869
+        ]
+      },
+      "properties": {
+        "name": "Mellow Yellow",
+        "depth_min_m": -18.3,
+        "depth_max_m": -18.3,
+        "n_dives": 1,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Mellow Yellow: ~18 m max, from 1 logged dive(s) (Garmin dive log)."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          32.672821,
+          -27.572188
+        ]
+      },
+      "properties": {
+        "name": "Mseni",
+        "depth_min_m": -11.0,
+        "depth_max_m": -11.0,
+        "n_dives": 1,
+        "alt_names": "",
+        "source": "garmin_dive_log",
+        "verified": true,
+        "description": "Mseni: ~11 m max, from 1 logged dive(s) (Garmin dive log)."
+      }
+    }
+  ]
+}

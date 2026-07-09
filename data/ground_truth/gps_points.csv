@@ -1,0 +1,6 @@
+name,lat,lon,depth_m,tide_note
+# Euan's ground-truth points. VALIDATION ONLY — never used to train/calibrate/tune.
+# depth_m is NEGATIVE metres (seafloor below chart datum). tide_note optional (e.g. "low +0.3m 2024-03-11 09:20").
+# Delete these example rows and paste your real ~20-30 points below.
+Example Two-Mile anchor,-27.5305,32.6905,-14.2,example - replace me
+Example Jesser Point,-27.5461,32.6820,-9.8,example - replace me

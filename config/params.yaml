@@ -1,0 +1,116 @@
+# Sodwana Bay bathymetry — all tunables live here. Never inline magic numbers in pipeline code.
+# Elevation convention EVERYWHERE: land positive, seafloor NEGATIVE metres. A positive value over water is a bug.
+# Processing CRS EPSG:4326; tiles/web EPSG:3857.
+
+project:
+  name: sodwana-bathymetry
+  crs_processing: "EPSG:4326"
+  crs_web: "EPSG:3857"
+  grid_res_m: 10          # SDB zone target cell size
+  nodata: -9999.0         # explicit nodata; NEVER 0 (0 m is a real depth at the waterline)
+
+# ---- Depth / optical model limits ----
+depth:
+  sdb_max_reliable_m: -25.0   # reliable SDB floor (negative down)
+  sdb_max_scene_m: -30.0      # clearest-scene stretch limit
+  optical_extinction_default_m: -26.0  # per-scene extinction fit overrides this
+  land_mask_min_m: 0.0        # anything > this over water is clipped as land leakage
+  nir_land_threshold: 0.06    # Sentinel-2 B8 reflectance above this = land (10 m keyless shoreline)
+
+# ---- Accuracy gates (hard exit criteria; do NOT lower to pass) ----
+gates:
+  rmse_0_15m_max: 1.5     # metres, vs held-out ATL24
+  rmse_15_25m_max: 2.5    # metres, vs held-out ATL24
+  depth_bands_m: [0, 5, 10, 15, 20, 25, 30]   # band edges for per-band RMSE/MAE
+  max_iterations: 6       # SDB accuracy loop cap
+  bias_report_only: true  # Euan's GPS points = validation only, reported not gated/trained
+
+# ---- SDB model (script 04) ----
+sdb:
+  train_holdout_split: 0.30   # 30% of ATL24 held out, split BY TRACK (never random)
+  split_seed: 42
+  atl24_confidence_min: "medium"
+  # spectral-only: x,y let XGBoost memorise train-track locations (spatial leakage) -> dropped
+  features: ["ln_B1", "ln_B2", "ln_B3", "ln_B4", "B8", "ratio_B2_B3", "ratio_B2_B4"]
+  xgboost:
+    n_estimators: 600
+    max_depth: 6
+    learning_rate: 0.03
+    subsample: 0.8
+    colsample_bytree: 0.8
+    reg_lambda: 1.0
+  glint:
+    method: "hedley"       # Hedley et al. NIR-based deglint on B8
+    nir_band: "B8"
+
+# ---- Sentinel-2 composite (script 03) ----
+sentinel2:
+  provider: "aws"          # aws (KEYLESS default, Element84 STAC over s3://sentinel-cogs) | gee | cdse
+  date_start: "2019-01-01"
+  date_end: "2026-07-01"
+  max_cloud_pct: 5
+  max_scenes: 12           # clearest N scenes to median-composite (turbid/swell scenes poison it)
+  bands: ["B1", "B2", "B3", "B4", "B8"]
+  resample_to_m: 10
+  composite: "median"
+
+# ---- Fusion priority stack (script 05) — first-write-wins, highest priority laid first ----
+fusion:
+  blend_zone_m: 300        # feathered distance-weighted blend width
+  priority:                # index 0 = highest priority (laid first; fills only empty cells)
+    - "priority_multibeam" # data/priority/*.tif (empty now, wired in)
+    - "atl24"              # gridded along-track lidar (train split only)
+    - "sdb"                # sdb_10m.tif (0 -> optical limit) — owns the validated optical zone
+    - "cgs_isobath"        # CGS 2005 survey isobaths gridded — fills deeper/offshore gaps
+    - "dewet_compton"      # sparse deep single-beam soundings
+    - "gebco_gmrt"         # smooth deep-water fill (last resort)
+  atl24_grid:
+    blockmedian_res_m: 10
+    surface_tension: 0.35
+    interpolate: false     # cross-track interpolation fabricates reef between tracks -> OFF
+  cgs_grid:
+    method: "linear"       # interpolate CGS survey surface between 5 m isobaths
+  cgs_datum_align: false   # naive isobath gridding is unreliable in the SDB band -> alignment there is contaminated
+  cgs_align_band_m: [-25.0, -12.0]
+  coastline_clip: true     # OSM/S2-NIR coastline; zero land leakage
+
+# ---- CGS Council-for-Geoscience ingest (script 09) ----
+cgs:
+  simplify_deg: 0.00015        # web geojson geometry simplification (~15 m)
+  isobath_densify_deg: 0.0002  # ~20 m spacing when densifying contours into fusion points
+  reef_classes: ["Reef", "Prominent Reef", "Scattered Reef"]
+
+# ---- Dive-log ingest (script 08) ----
+dive_logs:
+  reef_candidates_csv: "data/dive_logs/reef_candidates.csv"   # cleaned/clustered (NEVER raw JSON)
+
+# ---- Prospecting layer (script 06) ----
+prospect:
+  bpi_inner_m: 100
+  bpi_outer_m: 500
+  min_dist_from_known_site_m: 500
+  rugosity_percentile: 92  # high-rugosity threshold (of valid marine pixels)
+  bpi_percentile: 92       # high positive BPI threshold
+  min_area_px: 12          # drop clusters smaller than ~1200 m^2 (specks/noise, not reef features)
+  edge_erode_px: 3         # ignore cells within N px of the data edge (SDB boundary noise)
+  max_leads: 100           # keep only the top-N by score
+
+# ---- Tiles (script 07) ----
+tiles:
+  encoding: "terrarium"    # switch to "custom" (0.01 m interval) if terracing appears
+  min_zoom: 8
+  max_zoom: 15             # z15 ~ 3 m/px at this latitude — matches data, invents nothing
+  max_payload_mb: 300
+  format: "png"
+
+# ---- Web app color ramp (metres, negative down) ----
+ramp:
+  stops:
+    - [0,    "#ffffff"]
+    - [-10,  "#00e5ff"]
+    - [-30,  "#0077ff"]
+    - [-60,  "#001f7a"]
+    - [-120, "#050510"]
+  hillshade: "igor"
+  contour_interval_m: 5
+  contour_interval_highzoom_m: 1

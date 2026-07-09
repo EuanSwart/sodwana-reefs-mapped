@@ -1,0 +1,64 @@
+{
+  "version": 8,
+  "name": "Sodwana Bathymetry",
+  "glyphs": "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
+  "sources": {
+    "basemap": {
+      "type": "vector",
+      "url": "https://tiles.openfreemap.org/planet"
+    },
+    "terrain-dem": {
+      "type": "raster-dem",
+      "tiles": ["tiles/xyz/{z}/{x}/{y}.png"],
+      "encoding": "terrarium",
+      "tileSize": 256,
+      "minzoom": 8,
+      "maxzoom": 15,
+      "bounds": [32.62, -27.62, 32.82, -27.32],
+      "attribution": "Bathymetry: Sentinel-2 SDB x ICESat-2 ATL24 x CGS 2005 x GEBCO/GMRT (fused, honest to ~3 m/px)"
+    }
+  },
+  "layers": [
+    { "id": "bg", "type": "background", "paint": { "background-color": "#0a0f1c" } },
+    { "id": "ocean-fill", "type": "fill", "source": "basemap", "source-layer": "water",
+      "paint": { "fill-color": "#0a1b3a" } },
+    {
+      "id": "color-relief",
+      "type": "color-relief",
+      "source": "terrain-dem",
+      "paint": {
+        "color-relief-opacity": 0.85,
+        "color-relief-color": [
+          "interpolate", ["linear"], ["elevation"],
+          -120, "#050510",
+          -60, "#001f7a",
+          -30, "#0077ff",
+          -10, "#00e5ff",
+          0, "#ffffff",
+          0.5, "rgba(255,255,255,0)"
+        ]
+      }
+    },
+    {
+      "id": "hillshade",
+      "type": "hillshade",
+      "source": "terrain-dem",
+      "paint": {
+        "hillshade-method": "igor",
+        "hillshade-exaggeration": 0.5,
+        "hillshade-shadow-color": "#00121f",
+        "hillshade-highlight-color": "#e8ffff"
+      }
+    },
+    {
+      "id": "coastline", "type": "line", "source": "basemap", "source-layer": "boundary",
+      "filter": ["==", ["get", "maritime"], 1],
+      "paint": { "line-color": "#3a5a80", "line-width": 0.6 }
+    },
+    {
+      "id": "place-labels", "type": "symbol", "source": "basemap", "source-layer": "place",
+      "layout": { "text-field": ["get", "name"], "text-font": ["Noto Sans Regular"], "text-size": 12 },
+      "paint": { "text-color": "#cfe4ff", "text-halo-color": "#0a0f1c", "text-halo-width": 1.2 }
+    }
+  ]
+}

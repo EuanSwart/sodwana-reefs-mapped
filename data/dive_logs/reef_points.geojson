@@ -1,0 +1,1436 @@
+{
+ "type": "FeatureCollection",
+ "features": [
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.686609737575054,
+     -27.520513320341706
+    ]
+   },
+   "properties": {
+    "name_raw": "Single-Gas Dive",
+    "reef": null,
+    "cluster": 2,
+    "max_depth_m": 12.725,
+    "start_time": "2024-12-26T10:04:47+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.69182059913874,
+     -27.527816304937005
+    ]
+   },
+   "properties": {
+    "name_raw": "Roonies",
+    "reef": "Roonies",
+    "cluster": 9,
+    "max_depth_m": 29.772,
+    "start_time": "2025-01-13T09:24:58+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.711733570322394,
+     -27.450956599786878
+    ]
+   },
+   "properties": {
+    "name_raw": "7 Mile",
+    "reef": "7 Mile",
+    "cluster": 10,
+    "max_depth_m": 23.032,
+    "start_time": "2025-01-17T08:04:26+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.695809714496136,
+     -27.510703895241022
+    ]
+   },
+   "properties": {
+    "name_raw": "Hotspot",
+    "reef": "Hotspot",
+    "cluster": 0,
+    "max_depth_m": 29.984,
+    "start_time": "2025-01-18T09:48:39+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.689025150612,
+     -27.52798369154334
+    ]
+   },
+   "properties": {
+    "name_raw": "Bikini",
+    "reef": "Bikini",
+    "cluster": 1,
+    "max_depth_m": 20.622,
+    "start_time": "2025-01-18T11:53:33+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.711985195055604,
+     -27.451215432956815
+    ]
+   },
+   "properties": {
+    "name_raw": "7 Mile",
+    "reef": "7 Mile",
+    "cluster": 10,
+    "max_depth_m": 24.168,
+    "start_time": "2025-01-19T07:34:47+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68471559509635,
+     -27.527455128729343
+    ]
+   },
+   "properties": {
+    "name_raw": "Antons",
+    "reef": "Antons",
+    "cluster": 11,
+    "max_depth_m": 16.911,
+    "start_time": "2025-01-19T10:04:46+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.69305055961013,
+     -27.491791555657983
+    ]
+   },
+   "properties": {
+    "name_raw": "Single-Gas Dive",
+    "reef": null,
+    "cluster": 15,
+    "max_depth_m": 19.972,
+    "start_time": "2025-01-20T07:51:48+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68812627531588,
+     -27.529659066349268
+    ]
+   },
+   "properties": {
+    "name_raw": "Single-Gas Dive",
+    "reef": null,
+    "cluster": 3,
+    "max_depth_m": 19.199,
+    "start_time": "2025-01-21T10:22:18+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.689226400107145,
+     -27.527354042977095
+    ]
+   },
+   "properties": {
+    "name_raw": "Single-Gas Dive",
+    "reef": null,
+    "cluster": 1,
+    "max_depth_m": 22.577,
+    "start_time": "2025-01-25T09:15:44+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.6862705219537,
+     -27.526660189032555
+    ]
+   },
+   "properties": {
+    "name_raw": "Apnea",
+    "reef": null,
+    "cluster": 6,
+    "max_depth_m": 16.85,
+    "start_time": "2025-01-27T07:21:30+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68656548112631,
+     -27.519189566373825
+    ]
+   },
+   "properties": {
+    "name_raw": "Pinnacles",
+    "reef": "Pinnacles",
+    "cluster": 7,
+    "max_depth_m": 12.385,
+    "start_time": "2025-01-27T09:25:36+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.70630528219044,
+     -27.492958987131715
+    ]
+   },
+   "properties": {
+    "name_raw": "Deep Blue - Staff",
+    "reef": "Deep Blue",
+    "cluster": 16,
+    "max_depth_m": 33.014,
+    "start_time": "2025-01-28T07:58:33+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.696010461077094,
+     -27.510525612160563
+    ]
+   },
+   "properties": {
+    "name_raw": "Hotspot - Staff",
+    "reef": "Hotspot",
+    "cluster": 0,
+    "max_depth_m": 25.35,
+    "start_time": "2025-01-28T10:28:53+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.69589596427977,
+     -27.510895673185587
+    ]
+   },
+   "properties": {
+    "name_raw": "Hotspot",
+    "reef": "Hotspot",
+    "cluster": 0,
+    "max_depth_m": 30.677,
+    "start_time": "2025-01-29T10:50:32+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.695702677592635,
+     -27.51067589968443
+    ]
+   },
+   "properties": {
+    "name_raw": "Hotspot",
+    "reef": "Hotspot",
+    "cluster": 0,
+    "max_depth_m": 27.318,
+    "start_time": "2025-01-31T08:22:36+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68931306898594,
+     -27.527617318555713
+    ]
+   },
+   "properties": {
+    "name_raw": "Bikini",
+    "reef": "Bikini",
+    "cluster": 1,
+    "max_depth_m": 21.79,
+    "start_time": "2025-01-31T10:54:55+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68644352443516,
+     -27.51936675980687
+    ]
+   },
+   "properties": {
+    "name_raw": "Pinnacles - Rescue Assist",
+    "reef": "Pinnacles",
+    "cluster": 7,
+    "max_depth_m": 12.02,
+    "start_time": "2025-02-02T11:54:20+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.69556521438062,
+     -27.510813362896442
+    ]
+   },
+   "properties": {
+    "name_raw": "Hotspot",
+    "reef": "Hotspot",
+    "cluster": 0,
+    "max_depth_m": 31.681,
+    "start_time": "2025-02-03T07:47:40+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68952035345137,
+     -27.527705244719982
+    ]
+   },
+   "properties": {
+    "name_raw": "Bikini",
+    "reef": "Bikini",
+    "cluster": 1,
+    "max_depth_m": 21.555,
+    "start_time": "2025-02-03T11:25:37+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68825929611921,
+     -27.529242569580674
+    ]
+   },
+   "properties": {
+    "name_raw": "Mellow Yellow",
+    "reef": "Mellow Yellow",
+    "cluster": 3,
+    "max_depth_m": 20.404,
+    "start_time": "2025-06-20T08:46:09+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.70747045055032,
+     -27.46307708323002
+    ]
+   },
+   "properties": {
+    "name_raw": "Snappers College - DMT: Mapping Dive 2",
+    "reef": "Snappers College",
+    "cluster": 17,
+    "max_depth_m": 23.332,
+    "start_time": "2025-06-28T09:23:52+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68806257285178,
+     -27.529528811573982
+    ]
+   },
+   "properties": {
+    "name_raw": "Mellow Yellow",
+    "reef": "Mellow Yellow",
+    "cluster": 3,
+    "max_depth_m": 19.976,
+    "start_time": "2025-07-01T07:43:23+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68638879060745,
+     -27.519243797287345
+    ]
+   },
+   "properties": {
+    "name_raw": "Pinnacles - DMT: OW assist",
+    "reef": "Pinnacles",
+    "cluster": 7,
+    "max_depth_m": 12.353,
+    "start_time": "2025-07-02T11:40:52+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.69603359512985,
+     -27.49863068573177
+    ]
+   },
+   "properties": {
+    "name_raw": "Hotspot",
+    "reef": "Hotspot",
+    "cluster": 18,
+    "max_depth_m": 30.526,
+    "start_time": "2025-07-03T07:57:49+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68609760329127,
+     -27.526724562048912
+    ]
+   },
+   "properties": {
+    "name_raw": "2 Buoy",
+    "reef": "2 Buoy",
+    "cluster": 6,
+    "max_depth_m": 14.856,
+    "start_time": "2025-07-03T09:40:44+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68836432136595,
+     -27.517931945621967
+    ]
+   },
+   "properties": {
+    "name_raw": "Wayne\u00e2\u20ac\u2122s World",
+    "reef": "Wayne\u00e2\u20ac\u2122s World",
+    "cluster": 19,
+    "max_depth_m": 20.308,
+    "start_time": "2025-07-03T11:49:54+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.686899080872536,
+     -27.521027382463217
+    ]
+   },
+   "properties": {
+    "name_raw": "4 Buoy",
+    "reef": "4 Buoy",
+    "cluster": 2,
+    "max_depth_m": 13.452,
+    "start_time": "2025-07-04T10:46:59+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.695636712014675,
+     -27.51052100211382
+    ]
+   },
+   "properties": {
+    "name_raw": "Hotspot -> Deep Sponge",
+    "reef": "Hotspot",
+    "cluster": 0,
+    "max_depth_m": 27.785,
+    "start_time": "2025-07-06T07:58:31+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.69612705335021,
+     -27.510673301294446
+    ]
+   },
+   "properties": {
+    "name_raw": "Hotspot",
+    "reef": "Hotspot",
+    "cluster": 0,
+    "max_depth_m": 27.663,
+    "start_time": "2025-07-08T08:43:32+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.685592090711,
+     -27.526148054748774
+    ]
+   },
+   "properties": {
+    "name_raw": "2 Buoy",
+    "reef": "2 Buoy",
+    "cluster": 8,
+    "max_depth_m": 14.712,
+    "start_time": "2025-07-08T11:47:09+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68593524582684,
+     -27.52665809355676
+    ]
+   },
+   "properties": {
+    "name_raw": "2 Buoy",
+    "reef": "2 Buoy",
+    "cluster": 6,
+    "max_depth_m": 16.853,
+    "start_time": "2025-07-08T13:47:45+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.699360121041536,
+     -27.496907953172922
+    ]
+   },
+   "properties": {
+    "name_raw": "Lettuce",
+    "reef": "Lettuce",
+    "cluster": 4,
+    "max_depth_m": 28.683,
+    "start_time": "2025-07-09T09:01:57+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68635802902281,
+     -27.522691609337926
+    ]
+   },
+   "properties": {
+    "name_raw": "Arches",
+    "reef": "Arches",
+    "cluster": 5,
+    "max_depth_m": 14.005,
+    "start_time": "2025-07-09T12:41:51+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.684939643368125,
+     -27.526135565713048
+    ]
+   },
+   "properties": {
+    "name_raw": "Caves -> Antons",
+    "reef": "Caves",
+    "cluster": 8,
+    "max_depth_m": 16.078,
+    "start_time": "2025-07-10T07:40:37+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.690026285126805,
+     -27.517712339758873
+    ]
+   },
+   "properties": {
+    "name_raw": "Simons Cave",
+    "reef": "Simons Cave",
+    "cluster": 20,
+    "max_depth_m": 15.411,
+    "start_time": "2025-07-10T10:20:04+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.686838479712605,
+     -27.52088581211865
+    ]
+   },
+   "properties": {
+    "name_raw": "Pinnacles",
+    "reef": "Pinnacles",
+    "cluster": 2,
+    "max_depth_m": 14.372,
+    "start_time": "2025-07-10T13:46:38+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68688256852329,
+     -27.5209678709507
+    ]
+   },
+   "properties": {
+    "name_raw": "4 Buoy",
+    "reef": "4 Buoy",
+    "cluster": 2,
+    "max_depth_m": 13.553,
+    "start_time": "2025-07-11T12:49:38+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.696056980639696,
+     -27.51114352606237
+    ]
+   },
+   "properties": {
+    "name_raw": "Hotspot",
+    "reef": "Hotspot",
+    "cluster": 0,
+    "max_depth_m": 29.728,
+    "start_time": "2025-07-13T07:46:16+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.695621624588966,
+     -27.511060712859035
+    ]
+   },
+   "properties": {
+    "name_raw": "Hotspot",
+    "reef": "Hotspot",
+    "cluster": 0,
+    "max_depth_m": 27.275,
+    "start_time": "2025-07-14T07:55:09+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68536846153438,
+     -27.526390627026558
+    ]
+   },
+   "properties": {
+    "name_raw": "Caves",
+    "reef": "Caves",
+    "cluster": 8,
+    "max_depth_m": 16.304,
+    "start_time": "2025-07-14T09:44:39+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68297132104635,
+     -27.529660323634744
+    ]
+   },
+   "properties": {
+    "name_raw": "Stringer",
+    "reef": "Stringer",
+    "cluster": 12,
+    "max_depth_m": 12.967,
+    "start_time": "2025-07-15T10:57:29+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68623330630362,
+     -27.52197017893195
+    ]
+   },
+   "properties": {
+    "name_raw": "Arches",
+    "reef": "Arches",
+    "cluster": 5,
+    "max_depth_m": 13.269,
+    "start_time": "2025-07-16T11:32:07+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.687718914821744,
+     -27.518014423549175
+    ]
+   },
+   "properties": {
+    "name_raw": "Wayne\u00e2\u20ac\u2122s World",
+    "reef": "Wayne\u00e2\u20ac\u2122s World",
+    "cluster": 21,
+    "max_depth_m": 14.598,
+    "start_time": "2025-07-17T10:44:44+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.69939834252,
+     -27.496690610423684
+    ]
+   },
+   "properties": {
+    "name_raw": "Lettuce",
+    "reef": "Lettuce",
+    "cluster": 4,
+    "max_depth_m": 29.049,
+    "start_time": "2025-07-19T08:20:28+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68968991935253,
+     -27.527614468708634
+    ]
+   },
+   "properties": {
+    "name_raw": "Hopscotch",
+    "reef": "Hopscotch",
+    "cluster": 1,
+    "max_depth_m": 23.129,
+    "start_time": "2025-07-19T10:33:23+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.70285755395889,
+     -27.492657154798508
+    ]
+   },
+   "properties": {
+    "name_raw": "Gotham",
+    "reef": "Gotham",
+    "cluster": 22,
+    "max_depth_m": 38.557,
+    "start_time": "2025-07-20T08:24:29+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.695898059755564,
+     -27.511010253801942
+    ]
+   },
+   "properties": {
+    "name_raw": "Hotspot",
+    "reef": "Hotspot",
+    "cluster": 0,
+    "max_depth_m": 27.398,
+    "start_time": "2025-07-22T07:41:02+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.6869906950742,
+     -27.520973067730665
+    ]
+   },
+   "properties": {
+    "name_raw": "4 Buoy",
+    "reef": "4 Buoy",
+    "cluster": 2,
+    "max_depth_m": 16.259,
+    "start_time": "2025-07-22T11:54:01+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.695256089791656,
+     -27.51093146391213
+    ]
+   },
+   "properties": {
+    "name_raw": "Hotspot",
+    "reef": "Hotspot",
+    "cluster": 0,
+    "max_depth_m": 29.684,
+    "start_time": "2025-07-23T07:38:57+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68624210730195,
+     -27.521656779572368
+    ]
+   },
+   "properties": {
+    "name_raw": "Arches",
+    "reef": "Arches",
+    "cluster": 5,
+    "max_depth_m": 14.567,
+    "start_time": "2025-11-24T08:20:42+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.685663839802146,
+     -27.52708364278078
+    ]
+   },
+   "properties": {
+    "name_raw": "2 Buoy -> Chain",
+    "reef": "2 Buoy",
+    "cluster": 23,
+    "max_depth_m": 16.265,
+    "start_time": "2025-11-24T10:39:13+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68478105776012,
+     -27.527902303263545
+    ]
+   },
+   "properties": {
+    "name_raw": "Antons",
+    "reef": "Antons",
+    "cluster": 24,
+    "max_depth_m": 17.16,
+    "start_time": "2025-11-26T08:16:52+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.69907245412469,
+     -27.49683016911149
+    ]
+   },
+   "properties": {
+    "name_raw": "Lettuce",
+    "reef": "Lettuce",
+    "cluster": 4,
+    "max_depth_m": 29.817,
+    "start_time": "2025-11-27T08:14:32+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68930342979729,
+     -27.52786684781313
+    ]
+   },
+   "properties": {
+    "name_raw": "Bikini",
+    "reef": "Bikini",
+    "cluster": 1,
+    "max_depth_m": 22.06,
+    "start_time": "2025-11-29T08:09:17+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68712949939072,
+     -27.531586987897754
+    ]
+   },
+   "properties": {
+    "name_raw": "Mellow Yellow",
+    "reef": "Mellow Yellow",
+    "cluster": 25,
+    "max_depth_m": 18.971,
+    "start_time": "2025-11-29T10:23:42+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.70769475027919,
+     -27.462629657238722
+    ]
+   },
+   "properties": {
+    "name_raw": "Snappers College",
+    "reef": "Snappers College",
+    "cluster": 26,
+    "max_depth_m": 24.098,
+    "start_time": "2025-12-01T07:57:42+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68947056494653,
+     -27.52749804407358
+    ]
+   },
+   "properties": {
+    "name_raw": "Bikini",
+    "reef": "Bikini",
+    "cluster": 1,
+    "max_depth_m": 21.226,
+    "start_time": "2025-12-03T07:21:35+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.686569252982736,
+     -27.52050133422017
+    ]
+   },
+   "properties": {
+    "name_raw": "4 Buoy -> Arches",
+    "reef": "4 Buoy",
+    "cluster": 2,
+    "max_depth_m": 13.979,
+    "start_time": "2025-12-03T09:25:40+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.686503874138,
+     -27.519082445651293
+    ]
+   },
+   "properties": {
+    "name_raw": "Pinnacles",
+    "reef": "Pinnacles",
+    "cluster": 7,
+    "max_depth_m": 13.161,
+    "start_time": "2025-12-04T09:51:17+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.684892285615206,
+     -27.532869335263968
+    ]
+   },
+   "properties": {
+    "name_raw": "Mellow Yellow",
+    "reef": "Mellow Yellow",
+    "cluster": 27,
+    "max_depth_m": 18.32,
+    "start_time": "2025-12-08T11:37:54+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.72818942554295,
+     -27.41371538490057
+    ]
+   },
+   "properties": {
+    "name_raw": "9 Mile",
+    "reef": "9 Mile",
+    "cluster": 28,
+    "max_depth_m": 19.344,
+    "start_time": "2025-12-09T07:26:06+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.688284777104855,
+     -27.528628511354327
+    ]
+   },
+   "properties": {
+    "name_raw": "Mellow Yellow",
+    "reef": "Mellow Yellow",
+    "cluster": 3,
+    "max_depth_m": 18.756,
+    "start_time": "2025-12-10T11:41:50+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.685915883630514,
+     -27.521129474043846
+    ]
+   },
+   "properties": {
+    "name_raw": "Single-Gas Dive",
+    "reef": null,
+    "cluster": 29,
+    "max_depth_m": 13.574,
+    "start_time": "2025-12-15T08:58:19+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68497568555176,
+     -27.52634570002556
+    ]
+   },
+   "properties": {
+    "name_raw": "Single-Gas Dive",
+    "reef": null,
+    "cluster": 8,
+    "max_depth_m": 13.883,
+    "start_time": "2025-12-27T11:36:53+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.684657759964466,
+     -27.52732546068728
+    ]
+   },
+   "properties": {
+    "name_raw": "Single-Gas Dive",
+    "reef": null,
+    "cluster": 11,
+    "max_depth_m": 16.104,
+    "start_time": "2025-12-29T09:36:08+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68261433579028,
+     -27.52953166142106
+    ]
+   },
+   "properties": {
+    "name_raw": "Single-Gas Dive",
+    "reef": null,
+    "cluster": 12,
+    "max_depth_m": 14.75,
+    "start_time": "2025-12-29T11:50:17+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68877017311752,
+     -27.524175457656384
+    ]
+   },
+   "properties": {
+    "name_raw": "Single-Gas Dive",
+    "reef": null,
+    "cluster": 30,
+    "max_depth_m": 17.759,
+    "start_time": "2026-01-02T10:16:40+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.69419745542109,
+     -27.511948188766837
+    ]
+   },
+   "properties": {
+    "name_raw": "Hotspot 2",
+    "reef": "Hotspot 2",
+    "cluster": 13,
+    "max_depth_m": 27.368,
+    "start_time": "2026-01-03T08:26:50+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.71145428530872,
+     -27.451831083744764
+    ]
+   },
+   "properties": {
+    "name_raw": "7 Mile",
+    "reef": "7 Mile",
+    "cluster": 31,
+    "max_depth_m": 21.147,
+    "start_time": "2026-01-05T07:09:58+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.69593661651015,
+     -27.51088896766305
+    ]
+   },
+   "properties": {
+    "name_raw": "Hotspot",
+    "reef": "Hotspot",
+    "cluster": 0,
+    "max_depth_m": 28.677,
+    "start_time": "2026-01-06T07:29:05+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68924282863736,
+     -27.527624359354377
+    ]
+   },
+   "properties": {
+    "name_raw": "Bikini",
+    "reef": "Bikini",
+    "cluster": 1,
+    "max_depth_m": 21.081,
+    "start_time": "2026-01-06T11:40:56+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.71147482097149,
+     -27.452759379521012
+    ]
+   },
+   "properties": {
+    "name_raw": "7 Mile",
+    "reef": "7 Mile",
+    "cluster": 14,
+    "max_depth_m": 22.191,
+    "start_time": "2026-01-07T07:28:54+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.6862327195704,
+     -27.5220263376832
+    ]
+   },
+   "properties": {
+    "name_raw": "Arches -> Wayne\u00e2\u20ac\u2122s World",
+    "reef": "Arches",
+    "cluster": 5,
+    "max_depth_m": 18.218,
+    "start_time": "2026-01-07T12:16:53+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.69442862831056,
+     -27.511790776625276
+    ]
+   },
+   "properties": {
+    "name_raw": "Hotspot 2",
+    "reef": "Hotspot 2",
+    "cluster": 13,
+    "max_depth_m": 28.637,
+    "start_time": "2026-01-08T06:50:48+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68843858502805,
+     -27.529451781883836
+    ]
+   },
+   "properties": {
+    "name_raw": "Mellow Yellow",
+    "reef": "Mellow Yellow",
+    "cluster": 3,
+    "max_depth_m": 19.568,
+    "start_time": "2026-01-08T09:30:25+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68625526688993,
+     -27.522391118109226
+    ]
+   },
+   "properties": {
+    "name_raw": "Arches",
+    "reef": "Arches",
+    "cluster": 5,
+    "max_depth_m": 12.5,
+    "start_time": "2026-01-08T13:01:23+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.69940932281315,
+     -27.49681399203837
+    ]
+   },
+   "properties": {
+    "name_raw": "Lettuce",
+    "reef": "Lettuce",
+    "cluster": 4,
+    "max_depth_m": 30.335,
+    "start_time": "2026-01-09T07:18:26+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68932128325105,
+     -27.52747834660113
+    ]
+   },
+   "properties": {
+    "name_raw": "Bikini",
+    "reef": "Bikini",
+    "cluster": 1,
+    "max_depth_m": 22.995,
+    "start_time": "2026-01-09T09:39:38+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.68663899041712,
+     -27.526637222617865
+    ]
+   },
+   "properties": {
+    "name_raw": "Single-Gas Dive",
+    "reef": null,
+    "cluster": 6,
+    "max_depth_m": 14.411,
+    "start_time": "2026-01-19T08:23:22+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.685336442664266,
+     -27.527498127892613
+    ]
+   },
+   "properties": {
+    "name_raw": "Southern Chain",
+    "reef": "Southern Chain",
+    "cluster": 32,
+    "max_depth_m": 17.468,
+    "start_time": "2026-01-22T10:47:12+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.71127734333277,
+     -27.45288049802184
+    ]
+   },
+   "properties": {
+    "name_raw": "7 Mile",
+    "reef": "7 Mile",
+    "cluster": 14,
+    "max_depth_m": 22.464,
+    "start_time": "2026-01-24T08:06:14+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.713721338659525,
+     -27.443290008231997
+    ]
+   },
+   "properties": {
+    "name_raw": "Ramsey",
+    "reef": "Ramsey",
+    "cluster": 33,
+    "max_depth_m": 20.432,
+    "start_time": "2026-01-26T08:04:07+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+    "coordinates": [
+     32.6882254332304,
+     -27.529006954282522
+    ]
+   },
+   "properties": {
+    "name_raw": "Mellow Yellow",
+    "reef": "Mellow Yellow",
+    "cluster": 3,
+    "max_depth_m": 19.205,
+    "start_time": "2026-01-26T11:00:28+02:00"
+   }
+  },
+  {
+   "type": "Feature",
+   "geometry": {
+    "type": "Point",
+   
