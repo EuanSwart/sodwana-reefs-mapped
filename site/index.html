@@ -63,6 +63,18 @@
     .section-title { font-size:var(--fs-xs); text-transform:uppercase; letter-spacing:.09em;
       color:var(--ink-faint); margin:var(--sp-3) 0 var(--sp-1); font-weight:600; }
 
+    /* ---- collapsible sidebar sections ---- */
+    .sec { margin:0; }
+    .sec summary { display:flex; align-items:center; justify-content:space-between; cursor:pointer;
+      user-select:none; transition:color .12s; }
+    .sec summary::-webkit-details-marker { display:none; }
+    .sec summary::marker { content:''; }
+    .sec summary:hover { color:var(--accent); }
+    .sec .chev { width:10px; height:10px; flex:none; margin-left:6px; transition:transform .16s ease; }
+    .sec .chev path { stroke:currentColor; }
+    .sec[open] > summary .chev { transform:rotate(90deg); }
+    .sec > summary + * { margin-top:0; }
+
     .iconbtn { flex:none; width:26px; height:26px; display:grid; place-items:center;
       background:transparent; color:var(--ink-dim); border:1px solid var(--edge);
       border-radius:var(--radius-sm); cursor:pointer; padding:0; transition:.15s; }
@@ -103,7 +115,7 @@
     .btn.primary { background:#0e3d4a; border-color:#1f6f82; }
     .btn.primary:hover { background:#12566a; border-color:var(--accent); }
     #admin-panel { margin-top:var(--sp-2); }
-    #admin-panel.hidden { display:none; }
+    .hidden { display:none; }
     .admin-list { max-height:210px; overflow:auto; border:1px solid var(--edge); border-radius:var(--radius-sm);
       padding:4px; margin:var(--sp-1) 0; background:#0a1424; }
     .arow { display:flex; align-items:center; gap:6px; padding:3px 4px; border-radius:4px; }
@@ -140,6 +152,15 @@
     .maplibregl-popup-close-button { color:var(--ink-dim); }
 
     a { color:var(--accent); }
+
+    /* ---- route planning panels ---- */
+    #route-hud { text-align:center; }
+    #route-hud .note { margin-top:0; }
+    #route-export-text { background:var(--panel-2); border:1px solid var(--edge); color:var(--ink);
+      border-radius:var(--radius-sm); padding:8px; font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+      resize:vertical; }
+    #route-export-text:focus { outline:none; border-color:var(--accent); }
+    #route-summary-body { font-size:var(--fs-md); }
   </style>
 </head>
 <body>
@@ -160,14 +181,18 @@
       </button>
     </div>
 
-    <div class="section-title">Layers</div>
-    <div id="toggle-3d"></div>
-    <div id="exwrap" hidden>Exaggeration <span id="exval">1.6×</span>
-      <input type="range" id="ex" min="1" max="3" step="0.1" value="1.6"></div>
-    <div id="toggles"></div>
+    <details id="sec-layers" class="sec" open>
+      <summary class="section-title">Layers<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></summary>
+      <div id="toggle-3d"></div>
+      <div id="exwrap" hidden>Exaggeration <span id="exval">1.6×</span>
+        <input type="range" id="ex" min="1" max="3" step="0.1" value="1.6"></div>
+      <div id="toggles"></div>
+    </details>
 
-    <div class="section-title">Reefs &amp; dive sites</div>
-    <ul id="site-list" class="sites"></ul>
+    <details id="sec-sites" class="sec" open>
+      <summary class="section-title">Reefs &amp; dive sites<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></summary>
+      <ul id="site-list" class="sites"></ul>
+    </details>
     <div class="note" id="data-note"></div>
 
     <div id="admin-bar">
@@ -191,6 +216,27 @@
     <div class="bar"></div>
     <div class="row"><span>−120</span><span>−60</span><span>0</span></div>
     <div class="foot">Colour-relief DEM &amp; CGS isobaths share this blue→cyan depth scale. Land renders transparent.</div>
+  </div>
+
+  <div id="route-hud" class="panel hidden" style="top:12px; left:50%; transform:translateX(-50%);">
+    <div id="route-hud-stats" class="note">0 points · 0 m</div>
+    <div style="display:flex; gap:8px; margin-top:6px;">
+      <button id="route-cancel" class="btn">Cancel</button>
+      <button id="route-confirm" class="btn primary" disabled>Confirm Route</button>
+    </div>
+  </div>
+
+  <div id="route-summary" class="panel hidden" style="top:12px; right:56px; width:320px; max-height:calc(100% - 24px); overflow:auto;">
+    <div class="sb-head" style="margin-bottom:8px;">
+      <div><strong>Planned route</strong></div>
+    </div>
+    <div id="route-summary-body"></div>
+    <textarea id="route-export-text" readonly hidden style="width:100%; min-height:120px; margin-top:8px;"></textarea>
+    <div style="display:flex; gap:8px; margin-top:10px;">
+      <button id="route-export-copy" class="btn" hidden>Copy</button>
+      <button id="route-summary-close" class="btn">Close</button>
+      <button id="route-summary-export" class="btn primary">Export</button>
+    </div>
   </div>
 
   <script src="vendor/maplibre-gl.js"

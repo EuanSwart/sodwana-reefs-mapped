@@ -2,6 +2,11 @@
  * No API keys, no build step. Loads local terrarium raster-dem tiles when present.
  * Depth convention: seafloor negative metres. */
 
+import {
+  haversineKm, bearingDeg, totalKm, routeLegs,
+  ACCURACY_BANDS, bandForDepth, sampleRouteProfile, formatRouteReport,
+} from './route.js';
+
 const AOI = { lonMin: 32.62, lonMax: 32.82, latMin: -27.62, latMax: -27.32 };
 const CENTER = [(AOI.lonMin + AOI.lonMax) / 2, (AOI.latMin + AOI.latMax) / 2];
 
@@ -50,10 +55,12 @@ const LAYER_DEFS = [
   { key: 'sites',     label: 'Dive sites',             def: true,  sw: 'var(--c-site)' },
   { key: 'tracks',    label: 'ICESat-2 tracks',        def: false, sw: 'var(--c-track)' },
   { key: 'prospects', label: 'Prospect leads',         def: false, sw: 'var(--c-prospect)' },
-  { key: 'geology',   label: 'Seafloor geology (CGS)', def: false, sw: 'var(--c-reef)' },
-  { key: 'isobaths',  label: 'CGS isobaths',           def: false, sw: 'var(--depth-10)' },
+  { key: 'geology',   label: 'Seafloor geology (CGS)', def: true,  sw: 'var(--c-reef)' },
+  { key: 'isobaths',  label: 'CGS isobaths',           def: true,  sw: 'var(--depth-10)' },
   { key: 'entries',   label: 'Dive entry points',      def: false, sw: 'var(--c-entry)' },
   { key: 'measure',   label: 'Measure distance',       def: false, kind: 'measure' },
+  { key: 'route',     label: 'Plan route',             def: false, kind: 'route' },
+  { key: 'scale',     label: 'Scale bar',              def: true,  kind: 'scale' },
 ];
 // which map layers each toggle key controls
 const VIS = {
@@ -88,6 +95,9 @@ const state = {
   layerConfig: {},          // key -> visitor-visible bool (from data/layer_config.json)
   toggleState: {},          // key -> checked bool (live UI state, survives re-render)
   adminMode: false,
+  scaleControl: null,       // maplibregl.ScaleControl instance, so we can show/hide its DOM element
+  demSource: null,          // maplibre-contour DemSource (also used to sample route depth profiles)
+  lastRoute: null,          // { wp, legsResult, profile } — last confirmed route, for summary export
 };
 LAYER_DEFS.forEach((d) => { state.toggleState[d.key] = d.def; });
 
@@ -114,10 +124,12 @@ async function start() {
   state.map = map;
   window.__mlmap = map;
   map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
-  map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-right');
+  state.scaleControl = new maplibregl.ScaleControl({ unit: 'metric' });
+  map.addControl(state.scaleControl, 'bottom-right');
   map.on('error', (e) => console.warn('map resource issue (non-fatal):', e && e.error && e.error.message));
 
   wireSidebarCollapse();
+  wireSectionCollapse();
   map.on('load', async () => {
     await onLoad(map);
     updateHash(map);
@@ -154,6 +166,8 @@ async function onLoad(map) {
   renderToggles(map);
   wireCoordinates(map);
   initMeasure(map);
+  initRoute(map);
+  wireRouteButtons(map);
   wireAdmin(map);
 }
 
@@ -173,11 +187,13 @@ async function setupContours(map) {
     catch (e) { console.warn('maplibre-contour unavailable; contours disabled', e); return; }
   }
   const tilesBase = new URL('tiles/xyz/', location.href).href;
-  const demSource = new mlcontour.DemSource({ url: tilesBase + '{z}/{x}/{y}.png', encoding: 'terrarium', maxzoom: 15, worker: true });
-  demSource.setupMaplibre(maplibregl);
+  // Kept on state (not a local) so the Plan Route tool can reuse it to sample
+  // the fused DEM along a route (route.js sampleRouteProfile -> getDemTile).
+  state.demSource = new mlcontour.DemSource({ url: tilesBase + '{z}/{x}/{y}.png', encoding: 'terrarium', maxzoom: 15, worker: true });
+  state.demSource.setupMaplibre(maplibregl);
   map.addSource('contour-src', {
     type: 'vector',
-    tiles: [demSource.contourProtocolUrl({
+    tiles: [state.demSource.contourProtocolUrl({
       thresholds: { 11: [10, 50], 13: [5, 25], 15: [1, 5] },
       elevationKey: 'ele', levelKey: 'level', contourLayer: 'contours',
     })],
@@ -207,7 +223,7 @@ async function loadVector(map, url, id, styler, after) {
 
 function geologyStyle(map, id) {
   map.addLayer({
-    id: 'geology-fill', type: 'fill', source: id, layout: { visibility: 'none' },
+    id: 'geology-fill', type: 'fill', source: id,
     paint: {
       'fill-opacity': 0.45,
       'fill-color': ['match', ['get', 'geology'],
@@ -215,7 +231,7 @@ function geologyStyle(map, id) {
         'Coarse Shelly Sediment', C.sedCoarse, 'Sand', C.sedSand, '#9aa7b0'],
     },
   });
-  map.addLayer({ id: 'geology-line', type: 'line', source: id, layout: { visibility: 'none' },
+  map.addLayer({ id: 'geology-line', type: 'line', source: id,
     paint: { 'line-color': '#00121f', 'line-width': 0.3, 'line-opacity': 0.4 } });
   map.on('click', 'geology-fill', (e) => {
     new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>CGS substrate</b><br>${esc(e.features[0].properties.geology)}`).addTo(map);
@@ -225,7 +241,7 @@ function geologyStyle(map, id) {
 function isobathStyle(map, id) {
   // CGS 2005 survey isobaths — coloured by depth on the shared blue->cyan scale.
   // Multiples of 25 m drawn thicker as index contours.
-  map.addLayer({ id: 'isobath-line', type: 'line', source: id, layout: { visibility: 'none' },
+  map.addLayer({ id: 'isobath-line', type: 'line', source: id,
     paint: {
       'line-color': depthRamp('depth_m'),
       'line-width': ['case', ['==', ['%', ['get', 'depth_m'], 25], 0], 1.5, 0.7],
@@ -233,7 +249,7 @@ function isobathStyle(map, id) {
     } });
   map.addLayer({
     id: 'isobath-label', type: 'symbol', source: id,
-    layout: { visibility: 'none', 'symbol-placement': 'line', 'symbol-spacing': 220,
+    layout: { 'symbol-placement': 'line', 'symbol-spacing': 220,
       'text-field': ['concat', ['to-string', ['get', 'depth_m']], ' m'], 'text-font': ['Noto Sans Regular'], 'text-size': 9 },
     paint: { 'text-color': depthRamp('depth_m'), 'text-halo-color': '#04263a', 'text-halo-width': 1.4 },
   });
@@ -396,6 +412,10 @@ function applyToggle(map, d, on, silent) {
     if (ew) ew.hidden = !on;
   } else if (d.kind === 'measure') {
     setMeasure(map, on);
+  } else if (d.kind === 'route') {
+    setRoute(map, on);
+  } else if (d.kind === 'scale') {
+    setScale(on);
   } else {
     (VIS[d.key] || []).forEach((id) => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none'));
   }
@@ -416,7 +436,7 @@ function wireCoordinates(map) {
   map.on('mousemove', (e) => { cur.textContent = `lat ${e.lngLat.lat.toFixed(5)}, lon ${e.lngLat.lng.toFixed(5)}`; });
   let marker = null;
   map.on('click', (e) => {
-    if (window.__measuring) return;
+    if (window.__measuring || window.__routing) return;
     const { lat, lng } = e.lngLat;
     if (marker) marker.remove();
     marker = new maplibregl.Marker({ color: C.accent }).setLngLat([lng, lat]).addTo(map);
@@ -443,7 +463,7 @@ function initMeasure(map) {
     const feats = pts.map((p) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: p } }));
     if (pts.length > 1) {
       feats.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: pts } });
-      const dd = totalKm(pts), b = bearing(pts[pts.length - 2], pts[pts.length - 1]);
+      const dd = totalKm(pts), b = bearingDeg(pts[pts.length - 2], pts[pts.length - 1]);
       document.getElementById('clicked').innerHTML = `${(dd * 1000).toFixed(0)} m total · last leg bearing ${b.toFixed(0)}°`;
     }
     map.getSource(srcId).setData(fc(feats));
@@ -451,8 +471,294 @@ function initMeasure(map) {
 }
 function setMeasure(map, on) {
   window.__measuring = on;
-  map.getCanvas().style.cursor = on ? 'crosshair' : '';
+  // Mutual exclusion: Measure and Plan Route are both global click-capture
+  // modes; only one may be active. Turning Measure on forces Route off.
+  if (on && window.__routing) {
+    const rEntry = LAYER_DEFS.find((d) => d.key === 'route');
+    const rcb = document.getElementById('t-route');
+    if (rcb) rcb.checked = false;
+    if (rEntry) applyToggle(map, rEntry, false);
+  }
   if (!on && window.__measureReset) window.__measureReset();
+  map.getCanvas().style.cursor = on ? 'crosshair' : '';
+}
+
+/* ---------- scale bar ---------- */
+function setScale(on) {
+  const el = document.querySelector('.maplibregl-ctrl-scale');
+  if (el) el.style.display = on ? '' : 'none';
+}
+
+/* ============================================================
+ * PLAN ROUTE — click a polyline of waypoints, sample the fused DEM
+ * along it (route.js), and produce a dive-planning summary + report.
+ * Mirrors the measure tool's structure: a global __routing flag, a
+ * single click handler that only acts when routing, waypoints in a
+ * module array, lazily-created GeoJSON source+layers, full setData()
+ * redraw on every click. All depth logic lives in route.js.
+ * ========================================================== */
+let routeWp = []; // [lon,lat] waypoints in click order (module scope: shared by route fns)
+
+function initRoute(map) {
+  const srcId = 'route-src';
+  window.__routingReset = () => {
+    routeWp = [];
+    if (map.getSource(srcId)) map.getSource(srcId).setData(fc([]));
+    updateRouteHud();
+  };
+  map.on('click', (e) => {
+    if (!window.__routing) return;
+    routeWp.push([e.lngLat.lng, e.lngLat.lat]);
+    rebuildRouteLayers(map, routeWp);
+    updateRouteHud();
+  });
+}
+
+function rebuildRouteLayers(map, wp) {
+  const srcId = 'route-src';
+  if (!map.getSource(srcId)) {
+    map.addSource(srcId, { type: 'geojson', data: fc([]) });
+    // Solid accent line — deliberately distinct from the measure tool's
+    // dashed cyan (#00e5ff) line so the two modes never read as the same.
+    map.addLayer({ id: 'route-line', type: 'line', source: srcId, filter: ['==', '$type', 'LineString'],
+      paint: { 'line-color': C.prospectOk, 'line-width': 3, 'line-opacity': 0.95 } });
+    map.addLayer({ id: 'route-pts', type: 'circle', source: srcId, filter: ['==', '$type', 'Point'],
+      paint: { 'circle-radius': 5, 'circle-color': '#ffffff', 'circle-stroke-color': C.prospectOk, 'circle-stroke-width': 2 } });
+    map.addLayer({ id: 'route-num', type: 'symbol', source: srcId, filter: ['==', '$type', 'Point'],
+      layout: { 'text-field': ['to-string', ['get', 'n']], 'text-font': ['Noto Sans Regular'], 'text-size': 11, 'text-offset': [0, -1.4] },
+      paint: { 'text-color': '#eafaff', 'text-halo-color': C.halo, 'text-halo-width': 1.4 } });
+  }
+  const feats = wp.map((p, i) => ({ type: 'Feature', properties: { n: i + 1 }, geometry: { type: 'Point', coordinates: p } }));
+  if (wp.length > 1) feats.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: wp } });
+  map.getSource(srcId).setData(fc(feats));
+}
+
+function updateRouteHud() {
+  const stats = document.getElementById('route-hud-stats');
+  if (stats) stats.textContent = `${routeWp.length} point${routeWp.length === 1 ? '' : 's'} · ${Math.round(totalKm(routeWp) * 1000)} m`;
+  const confirm = document.getElementById('route-confirm');
+  if (confirm) confirm.disabled = routeWp.length < 2;
+}
+
+function setRoute(map, on) {
+  window.__routing = on;
+  const hud = document.getElementById('route-hud');
+  const summary = document.getElementById('route-summary');
+  if (on) {
+    // Mutual exclusion: turning Route on forces Measure off.
+    if (window.__measuring) {
+      const mEntry = LAYER_DEFS.find((d) => d.key === 'measure');
+      const mcb = document.getElementById('t-measure');
+      if (mcb) mcb.checked = false;
+      if (mEntry) applyToggle(map, mEntry, false);
+    }
+    if (hud) hud.classList.remove('hidden');
+    if (summary) summary.classList.add('hidden');
+    if (window.__routingReset) window.__routingReset(); // start clean
+  } else {
+    if (window.__routingReset) window.__routingReset();
+    if (hud) hud.classList.add('hidden');
+    if (summary) summary.classList.add('hidden');
+  }
+  map.getCanvas().style.cursor = on ? 'crosshair' : '';
+}
+
+function wireRouteButtons(map) {
+  const routeEntry = () => LAYER_DEFS.find((d) => d.key === 'route');
+  const exitRoute = () => {
+    const cb = document.getElementById('t-route');
+    if (cb) cb.checked = false;
+    applyToggle(map, routeEntry(), false);
+  };
+  const cancel = document.getElementById('route-cancel');
+  if (cancel) cancel.onclick = () => exitRoute();
+  const confirm = document.getElementById('route-confirm');
+  if (confirm) confirm.onclick = async () => {
+    if (routeWp.length < 2) return;
+    await openRouteSummary(map, routeWp.slice());
+  };
+  const close = document.getElementById('route-summary-close');
+  if (close) close.onclick = () => {
+    document.getElementById('route-summary').classList.add('hidden');
+    exitRoute(); // Close behaves like Cancel (per design), just after a summary was shown
+  };
+  const exportBtn = document.getElementById('route-summary-export');
+  if (exportBtn) exportBtn.onclick = () => {
+    if (!state.lastRoute) return;
+    const { wp, legsResult, profile } = state.lastRoute;
+    const ta = document.getElementById('route-export-text');
+    ta.value = formatRouteReport(wp, legsResult, profile);
+    ta.hidden = false;
+    const copy = document.getElementById('route-export-copy');
+    if (copy) copy.hidden = false;
+  };
+  const copyBtn = document.getElementById('route-export-copy');
+  if (copyBtn) copyBtn.onclick = () => navigator.clipboard.writeText(document.getElementById('route-export-text').value);
+}
+
+async function openRouteSummary(map, wp) {
+  const legsResult = routeLegs(wp);
+  // sampleRouteProfile never throws (per route.js contract); a missing
+  // demSource just yields all-null depths, not a crash.
+  const profile = await sampleRouteProfile(state.demSource, wp);
+  state.lastRoute = { wp: wp.slice(), legsResult, profile };
+
+  const body = document.getElementById('route-summary-body');
+  if (body) body.innerHTML = buildRouteSummaryHTML(wp, legsResult, profile);
+  const ta = document.getElementById('route-export-text');
+  if (ta) { ta.hidden = true; ta.value = ''; }
+  const copy = document.getElementById('route-export-copy');
+  if (copy) copy.hidden = true;
+
+  document.getElementById('route-hud').classList.add('hidden');
+  document.getElementById('route-summary').classList.remove('hidden');
+}
+
+// One depth reading (signed negative metres) with its confidence-band tag.
+function depthReadingHTML(reading) {
+  if (!reading || reading.depthM == null) return 'no data (land / outside coverage)';
+  const b = reading.band;
+  const tag = b ? ` <small style="color:var(--ink-faint)">${esc(b.label)} — ${esc(b.status)}</small>` : '';
+  return `${reading.depthM.toFixed(1)} m${tag}`;
+}
+
+function buildRouteSummaryHTML(wp, legsResult, profile) {
+  const stats = profile && profile.stats;
+  const P = [];
+
+  // Entry point (decimal + DDM, matching the coordinate-pin readout style)
+  const [elon, elat] = wp[0];
+  P.push('<div class="section-title" style="margin-top:0">Entry point</div>');
+  P.push(`<div><code>${elat.toFixed(6)}, ${elon.toFixed(6)}</code><br>${ddm(elat, elon)}</div>`);
+
+  // Waypoint list
+  P.push(`<div class="section-title">Waypoints (${wp.length})</div>`);
+  P.push('<ol style="margin:2px 0 0;padding-left:20px;font-variant-numeric:tabular-nums;">');
+  wp.forEach((pt) => P.push(`<li><code>${pt[0].toFixed(6)}, ${pt[1].toFixed(6)}</code></li>`));
+  P.push('</ol>');
+
+  // Honesty warning banner when the route enters lower-confidence depth bands
+  const crossed = (profile && profile.bandsCrossed) || [];
+  if (crossed.includes('optical-wall') || crossed.includes('coarse')) {
+    const bandObj = ACCURACY_BANDS.find((b) => b.key !== 'validated' && crossed.includes(b.key));
+    const statusTxt = bandObj ? bandObj.status : 'lower confidence beyond 15 m';
+    P.push(`<div style="margin-top:10px;padding:7px 9px;border:1px solid var(--c-prospect);border-radius:var(--radius-sm);background:#2a0e22;color:var(--ink);font-size:var(--fs-sm);">
+      &#9888; This route passes deeper than 15 m. Depths beyond 15 m are lower-confidence — ${esc(statusTxt)}.</div>`);
+  }
+
+  // Depth profile chart
+  P.push('<div class="section-title">Depth profile</div>');
+  P.push(routeProfileSVG(profile));
+
+  // Depth summary (signed negative values, each tagged with its band)
+  P.push('<div class="section-title">Depth summary</div>');
+  if (stats) {
+    P.push('<div style="line-height:1.7;">');
+    P.push(`Entry: ${depthReadingHTML(stats.entry)}<br>`);
+    if (stats.max && stats.max.depthM != null) {
+      P.push(`Deepest: ${depthReadingHTML(stats.max)} <small style="color:var(--ink-faint)">(at ${Math.round(stats.max.dM)} m along route)</small><br>`);
+    } else {
+      P.push('Deepest: no data (land / outside coverage)<br>');
+    }
+    P.push(`Average: ${stats.avg && stats.avg.depthM != null ? stats.avg.depthM.toFixed(1) + ' m' : 'no data (land / outside coverage)'}<br>`);
+    P.push(`Exit: ${depthReadingHTML(stats.exit)}<br>`);
+    P.push(`<small style="color:var(--ink-faint)">${stats.validCount}/${stats.sampleCount} samples had depth data</small>`);
+    P.push('</div>');
+  } else {
+    P.push('<div class="note">No depth profile available.</div>');
+  }
+
+  // Per-leg breakdown
+  const legs = (legsResult && legsResult.legs) || [];
+  P.push('<div class="section-title">Legs</div>');
+  if (legs.length) {
+    P.push('<div style="font-variant-numeric:tabular-nums;line-height:1.6;">');
+    legs.forEach((leg) => {
+      P.push(`Leg ${leg.index}: heading ${String(Math.round(leg.bearingDeg)).padStart(3, '0')}°, distance ${Math.round(leg.distanceM)} m<br>`);
+    });
+    P.push(`<b>Total: ${Math.round(legsResult.totalM)} m (${(legsResult.totalM / 1000).toFixed(2)} km)</b>`);
+    P.push('</div>');
+  } else {
+    P.push('<div class="note">Single point — no legs.</div>');
+  }
+
+  return P.join('');
+}
+
+/* Pure SVG string (no DOM/map dependency). X = distance along route,
+ * Y = depth (0 at top, more negative lower). The plotted line BREAKS at
+ * null-depth samples — one polyline per contiguous valid run, coloured by
+ * the WORST (highest-uncertainty) band in that run so the chart never
+ * overstates confidence. */
+function routeProfileSVG(profile) {
+  const W = 320, H = 168;
+  const plotX0 = 40, plotX1 = 312, plotY0 = 12, plotY1 = 118;
+  const samples = (profile && profile.samples) || [];
+  const totalM = (profile && profile.totalM) || 0;
+  let dataMin = 0;
+  for (const s of samples) if (s.depthM != null && s.depthM < dataMin) dataMin = s.depthM;
+  const yBottom = Math.min(-25, dataMin); // most-negative Y bound (at least -25 m)
+  const xFor = (dM) => (totalM > 0 ? plotX0 + (dM / totalM) * (plotX1 - plotX0) : (plotX0 + plotX1) / 2);
+  const yFor = (d) => plotY0 + (yBottom !== 0 ? (0 - d) / (0 - yBottom) : 0) * (plotY1 - plotY0);
+
+  // Band -> colour. Cool for validated, warmer as confidence drops (caution
+  // reads better than the near-invisible dark-blue end of --depth-* on the
+  // dark panel). --depth-10 kept for the validated tier.
+  const bandColor = { validated: 'var(--depth-10)', 'optical-wall': '#ffb020', coarse: '#ff5db1' };
+  const bandIdx = (k) => ACCURACY_BANDS.findIndex((b) => b.key === k);
+
+  const P = [];
+  P.push(`<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;margin-top:4px;background:#0a1424;border:1px solid var(--edge);border-radius:6px;">`);
+
+  // Y gridlines + labels at 0, -15, -25 (+ route max if deeper than -25)
+  const ticks = [0, -15, -25];
+  if (dataMin < -25) ticks.push(Math.round(dataMin));
+  ticks.forEach((t) => {
+    if (t < yBottom - 0.001) return;
+    const y = yFor(t);
+    P.push(`<line x1="${plotX0}" y1="${y.toFixed(1)}" x2="${plotX1}" y2="${y.toFixed(1)}" stroke="#24406b" stroke-width="0.6"${t === 0 ? '' : ' stroke-dasharray="3 3"'}/>`);
+    P.push(`<text x="${plotX0 - 4}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="#8fb3e0">${t} m</text>`);
+  });
+
+  // X axis endpoints
+  P.push(`<text x="${plotX0}" y="${plotY1 + 12}" font-size="9" fill="#7e9bc4">0 m</text>`);
+  P.push(`<text x="${plotX1}" y="${plotY1 + 12}" text-anchor="end" font-size="9" fill="#7e9bc4">${Math.round(totalM)} m</text>`);
+
+  // Contiguous valid runs — one polyline each, broken across null gaps.
+  const runs = [];
+  let cur = null;
+  for (const s of samples) {
+    if (s.depthM == null) { cur = null; continue; }
+    if (!cur) { cur = []; runs.push(cur); }
+    cur.push(s);
+  }
+  runs.forEach((run) => {
+    let worst = 0;
+    run.forEach((s) => { const i = s.band ? bandIdx(s.band.key) : 0; if (i > worst) worst = i; });
+    const color = bandColor[ACCURACY_BANDS[worst].key] || 'var(--depth-10)';
+    if (run.length === 1) {
+      P.push(`<circle cx="${xFor(run[0].dM).toFixed(1)}" cy="${yFor(run[0].depthM).toFixed(1)}" r="1.8" fill="${color}"/>`);
+    } else {
+      const pts = run.map((s) => `${xFor(s.dM).toFixed(1)},${yFor(s.depthM).toFixed(1)}`).join(' ');
+      P.push(`<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>`);
+    }
+  });
+  if (!runs.length) {
+    P.push(`<text x="${W / 2}" y="${(plotY0 + plotY1) / 2}" text-anchor="middle" font-size="10" fill="#7e9bc4">no depth data along this route</text>`);
+  }
+
+  // Legend
+  let lx = plotX0;
+  const ly = H - 10;
+  ACCURACY_BANDS.forEach((b) => {
+    const col = bandColor[b.key];
+    P.push(`<rect x="${lx}" y="${ly - 8}" width="9" height="9" rx="2" fill="${col}"/>`);
+    P.push(`<text x="${lx + 12}" y="${ly}" font-size="8" fill="#8fb3e0">${b.key}</text>`);
+    lx += 12 + b.key.length * 4.6 + 12;
+  });
+
+  P.push('</svg>');
+  return P.join('');
 }
 
 /* ============================================================
@@ -472,6 +778,31 @@ function wireSidebarCollapse() {
   let start = false;
   try { start = localStorage.getItem('sb-collapsed') === '1'; } catch { /* ignore */ }
   apply(start);
+}
+
+/* ============================================================
+ * SECTION COLLAPSE — persist open/closed state of the native
+ * <details> sidebar sections (Layers, Reefs & dive sites) across
+ * reloads, same convention as wireSidebarCollapse() above.
+ * ========================================================== */
+function wireSectionCollapse() {
+  const sections = [
+    { id: 'sec-layers', key: 'sb-section-layers' },
+    { id: 'sec-sites', key: 'sb-section-sites' },
+  ];
+  sections.forEach(({ id, key }) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    let openState = true; // default open, matches the `open` attribute already in the HTML
+    try {
+      const stored = localStorage.getItem(key);
+      if (stored !== null) openState = stored === '1';
+    } catch { /* ignore */ }
+    el.open = openState;
+    el.addEventListener('toggle', () => {
+      try { localStorage.setItem(key, el.open ? '1' : '0'); } catch { /* ignore */ }
+    });
+  });
 }
 
 /* ============================================================
@@ -586,19 +917,8 @@ function ddm(lat, lon) {
   };
   return `${f(lat, 'N', 'S')} ${f(lon, 'E', 'W')}`;
 }
-function bearing(a, b) {
-  const toR = (x) => x * Math.PI / 180, toD = (x) => x * 180 / Math.PI;
-  const y = Math.sin(toR(b[0] - a[0])) * Math.cos(toR(b[1]));
-  const x = Math.cos(toR(a[1])) * Math.sin(toR(b[1])) - Math.sin(toR(a[1])) * Math.cos(toR(b[1])) * Math.cos(toR(b[0] - a[0]));
-  return (toD(Math.atan2(y, x)) + 360) % 360;
-}
-function haversine(a, b) {
-  const R = 6371, toR = (x) => x * Math.PI / 180;
-  const dlat = toR(b[1] - a[1]), dlon = toR(b[0] - a[0]);
-  const h = Math.sin(dlat / 2) ** 2 + Math.cos(toR(a[1])) * Math.cos(toR(b[1])) * Math.sin(dlon / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
-function totalKm(pts) { let s = 0; for (let i = 1; i < pts.length; i++) s += haversine(pts[i - 1], pts[i]); return s; }
+// haversineKm / bearingDeg / totalKm now live in route.js (imported at top) —
+// the measure tool and Plan Route share the same great-circle formulas there.
 function fc(features) { return { type: 'FeatureCollection', features }; }
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 async function getJSON(url) { try { const r = await fetch(url); return r.ok ? await r.json() : null; } catch { return null; } }
