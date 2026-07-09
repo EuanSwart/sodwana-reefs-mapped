@@ -151,3 +151,118 @@ Interrupt him only for: his GPS points CSV, GEE auth (if used), GitHub repo/Page
 - [session 2026-07-09T15:16Z] review pipeline output; append real discoveries here.
 - [session 2026-07-09T15:52Z] review pipeline output; append real discoveries here.
 - [session 2026-07-09T15:55Z] review pipeline output; append real discoveries here.
+- [session 2026-07-09T15:57Z] review pipeline output; append real discoveries here.
+- [session 2026-07-09T15:58Z] review pipeline output; append real discoveries here.
+- [session 2026-07-09T16:00Z] review pipeline output; append real discoveries here.
+- [2026-07-09] New-data-source evaluation pass (data-scout + qa-validator subagents): tried to get
+  real depth values from Copernicus Marine `BATHYMETRY_GLO_PHY_COASTAL_L4_MY_016_001` (100 m
+  Sentinel-2 SDB, free-account-gated) and OSM Overpass seamark depths — both blocked this session
+  by the sandbox's outbound network allowlist (Copernicus needs login credentials we don't have;
+  Overpass's `/api/interpreter` returns empty bodies through this sandbox's `web_fetch`, plus a
+  ~250-char URL cap on WMTS `GetFeatureInfo`). Real, actionable find: **de Wet & Compton (2021)
+  SA shelf bathymetry** (free 28 MB zip, no login, johnscompton.com/maps/) is the actual data
+  behind the `dewet_compton` fusion tier already wired in `config/params.yaml` — that tier has
+  never had a file. ETOPO 2022 rejected as redundant with GEBCO/GMRT; SANHO charts rejected
+  (paid); iSimangaliso downloads are visitor PDFs only, no GIS. Built and independently re-verified
+  a reusable harness `reports/eval_scratch/rmse_against_holdout.py` (matches validate.py's band
+  gates, 0-15m<=1.5m/15-25m<=2.5m) so scoring any of these against the ATL24 holdout is a 5-minute
+  job once real files exist. Nothing in pipeline/, site/, config/, or the train split/GPS ground
+  truth was touched — confirmed via git status. Full writeup: `reports/new_data_sources_evaluation_2026-07-09.md`.
+- [2026-07-09] Reviewed 6 papers Euan supplied (3 UKZN ResearchSpace bitstreams + 2 local
+  Downloads PDFs + 1 paywalled ScienceDirect abstract) for real bathymetric data. None contain a
+  downloadable grid/CSV (all pre-open-data-era theses/papers, maps are physical/image plates), but
+  **Green (2009) PhD thesis Appendix 4 confirms a real Reson Seabat 8111 multibeam survey (392 km²,
+  29-838m, ~1m resolution) over Leven Point-Island Rock was explicitly withheld from publication**
+  ("earmarked for publication at a later date") and names who holds it: Peter Ramsay/Marine
+  GeoSolutions (Pty) Ltd (physically collected it), Dr Andrew Green (greena1@ukzn.ac.za, PI), and
+  Council for Geoscience Marine Geoscience Unit (co-funded, same CGS already integrated via the
+  2005 survey). Salzmann (2013) MSc independently corroborates Green's group holds data over
+  exactly Mabibi/Sodwana/Diepgat/Leadsman/Leven canyons. Ramsay's 1991 PhD thesis has a real canyon
+  table (Wright Canyon to -453m, White Sands to -353m) but only as a 1991 Surfer paper map, no
+  digital soundings recovered, GPS ~48m error (too coarse to fuse as-is). Miller (1998) MSc
+  (Lake Sibaya) confirmed out of the ocean AOI entirely, dropped. Full writeup:
+  `reports/paper_review_2026-07-09.md`. Extracted PDF text left in the session outputs dir (not
+  the repo) at paper_extracts/{miller_1998,green_2009}.txt — not committed, scratch only.
+irmed-cause systematic bias still count as honest, or does it need a proper datum lookup
+  first). (3) OSM Overpass: still blocked from this sandbox even with corrected query syntax and a
+  mirror host — confirmed sandbox-network limitation, not a source problem; separately, the
+  overpass-turbo.eu query text handed to Euan in the prior session had a real bug (a typographic
+  minus sign `−` instead of ASCII `-` in the bbox, which is what threw his parse error) — corrected
+  and handed back, not yet run by him. Also fixed: `reports/eval_scratch/rmse_against_holdout.py`
+  had `HOLDOUT_PATH` hardcoded to a now-dead prior-session sandbox path
+  (`/sessions/zen-practical-volta/...`); now resolved relative to the script's own location so the
+  harness is portable across sessions/machines. Lesson: this sandbox's outbound network
+  reachability is NOT a fixed property — Copernicus was unreachable in one session and worked
+  fine in the next; don't permanently write off a source after one network failure, retry later.
+- [2026-07-10] Wired Copernicus `phy_wk` into `pipeline/05_fuse_dem.py` as a band-conditional
+  override (replace SDB with Copernicus only where SDB's own value falls in 15-25 m), per Euan's
+  request. Ran it for real (`05_fuse_dem.py` -> `validate.py`): **15-25 m gate RMSE went from
+  4.90 m to 5.06 m — a regression, not the hoped-for improvement.** Diagnosed by sampling the
+  fused DEM's `source` band at each holdout point: at the 35 points the override actually touched,
+  SDB was already accurate there (RMSE 1.13 m) and got replaced by Copernicus's own ~1.2 m-biased
+  value (RMSE 2.96 m at those same points) — Copernicus's *better aggregate* RMSE across its whole
+  footprint doesn't mean "better where SDB is wrong"; "SDB says 15-25 m" selects by depth, not by
+  SDB error, and this AOI's sparse Copernicus coverage happened to land on an already-good patch.
+  Disabled by default (`fusion.copernicus_phy_wk_enabled: false` in `config/params.yaml`), code
+  and full band-override machinery left in place and documented (not deleted) for a future
+  attempt with a smarter selection mask (e.g. local disagreement/uncertainty, not raw depth).
+  Confirmed `validate.py` reproduces the known baseline exactly (1.35 / 4.90) after disabling.
+  Lesson: a source with better standalone/aggregate accuracy than what it's replacing can still
+  make a fused result *worse* if the swap-in criterion doesn't correlate with where the
+  original source is actually failing — always re-run the full holdout validation after wiring
+  in a new tier, never assume from the source's own standalone number.
+- [session 2026-07-09T21:15Z] review pipeline output; append real discoveries here.
+- [session 2026-07-09T21:24Z] review pipeline output; append real discoveries here.
+- [2026-07-10] Six site UI requests implemented via `frontend-builder` (site/app.js, site/index.html
+  only): (1) **Admin "preview as visitor" mode** — the admin password gate (`ADMIN_HASH`, default
+  "sodwana") and per-layer `layerConfig`/hidden-site machinery already existed but were unused (no
+  layer was ever actually set hidden, and admin had no way to see what a visitor sees without a
+  separate incognito browser). Added `state.previewAsVisitor` + `isEffectiveAdmin()` helper (gates
+  `sitesForDisplay()` and `renderToggles()`), a "Preview as visitor" button in the admin panel, and
+  a top-center exit banner. Admin panel itself stays reachable while previewing (not gated) so you
+  can always exit. Which layers/sites to actually mark admin-only is still Euan's call via the
+  existing admin panel checkboxes + Export — nothing was hidden by default. (2) Contour zoom-13
+  ("intermediate") threshold changed `[5,25]`→`[2,10]` m (2 m minor / 10 m major); zoom 11 and 15
+  left alone. `config/params.yaml`'s `contour_interval_m` doc value synced 5→2 to match (it mirrors
+  app.js for documentation only — no pipeline script reads it; app.js's live `thresholds` object is
+  the actual runtime source of truth). (3) Depth legend made collapsible (chevron reused from the
+  sidebar `.sec` pattern, state persisted to `localStorage['legend-collapsed']`). (4) Scale bar
+  moved `bottom-right`→`bottom-left` (was visually colliding with the legend, both anchored
+  bottom-right) and restyled to the dark panel theme instead of MapLibre's default white/black bar.
+  (5) Cursor coordinate readout (`#readout`) moved from a full bottom-left panel to a slim,
+  semi-transparent (opacity .72→1 on hover) bottom-center strip — JS logic in `wireCoordinates()`
+  untouched, only position/style. (6) CGS isobath label text-color was reusing the SAME depth-ramp
+  expression as the line color (`isobathStyle()`), so deep isobaths (-60 to -95 m) rendered in
+  near-black navy text against a dark halo — illegible. Fixed to a fixed light `#eafaff` text color
+  (matching `contour-labels`' already-working pattern) + halo width bumped 1.4→1.6; the isobath
+  *line* color still uses the depth ramp, only the label text changed. **Bug found + fixed along the
+  way**: MapLibre's own controls (nav/scale/attribution) carry an explicit `z-index:2`, which was
+  painting OVER this app's panels (no z-index set) regardless of DOM order — surfaced by the
+  collapsed legend chip sinking invisibly behind the attribution control. Added `z-index:3` to the
+  shared `.panel` class. **Second bug found + fixed** (self-inflicted by moving the scale bar to
+  bottom-left in this same session): `#sidebar`'s `max-height:calc(100% - 24px)` lets it grow
+  almost full-viewport-tall with a long site list, and since it's later in the DOM than the map's
+  control containers it was covering the relocated scale bar even after the z-index fix (sidebar is
+  also `.panel`, same z-index, DOM order still decides ties). Capped sidebar `max-height` to
+  `calc(100% - 90px)` to always leave bottom clearance; `overflow:auto` already handles scrolling
+  within that cap, so no site-list content is lost. Verified via Playwright screenshots (9 states +
+  all layer toggles, saved locally to `reports/screenshots/` — NOT committed to git, 16 MB of JPEGs
+  isn't worth the repo bloat for a UI-only change; the project's own screenshot-commit rule only
+  applies to DEM/ramp/tile changes) and independently re-checked via Claude Preview DOM inspection
+  (sidebar/scale-bar/readout computed styles, legend collapse toggle, zero console errors).
+- [2026-07-10] Wrote `reports/ml_spline_fusion_feasibility_2026-07-09.md`: feasibility check on
+  using ML + spatial splining/smoothing (+ Copernicus) to improve fused-DEM accuracy. Recommends
+  **residual kriging/GP correction on top of the existing SDB model** (not a new primary model) —
+  found published precedent (2025 SDB literature) for exactly this two-scale pattern (ML for
+  large-scale trend, kriging the *residuals* for the small-scale field) and confirmed it does NOT
+  repeat the x,y spatial-leakage trap from the original SDB training (that trap was `x,y` as
+  *predictive features*; residual kriging is geostatistical interpolation of the *error* field,
+  evaluated by the same track-holdout gate). Also proposes using the residual-GP's own per-pixel
+  uncertainty as the Copernicus-blending criterion instead of the depth-threshold rule that already
+  failed (see the 2026-07-10 Copernicus band-override entry above) — a principled fix to that
+  exact diagnosed bug. No new dependencies needed: `scipy.interpolate.RBFInterpolator` and
+  `sklearn.gaussian_process.GaussianProcessRegressor` are both available via already-installed
+  packages. Not implemented — flagged as one bounded `sdb-modeler` iteration for a future session,
+  with the same exit criteria as the existing accuracy loop (pass → wire in + document; improves
+  but still fails → report the honest number, same as today; no improvement → discard + document).
+- [session 2026-07-09T21:45Z] review pipeline output; append real discoveries here.

@@ -95,6 +95,7 @@ const state = {
   layerConfig: {},          // key -> visitor-visible bool (from data/layer_config.json)
   toggleState: {},          // key -> checked bool (live UI state, survives re-render)
   adminMode: false,
+  previewAsVisitor: false,  // admin-only: simulate the visitor view without logging out
   scaleControl: null,       // maplibregl.ScaleControl instance, so we can show/hide its DOM element
   demSource: null,          // maplibre-contour DemSource (also used to sample route depth profiles)
   lastRoute: null,          // { wp, legsResult, profile } — last confirmed route, for summary export
@@ -125,11 +126,12 @@ async function start() {
   window.__mlmap = map;
   map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
   state.scaleControl = new maplibregl.ScaleControl({ unit: 'metric' });
-  map.addControl(state.scaleControl, 'bottom-right');
+  map.addControl(state.scaleControl, 'bottom-left');
   map.on('error', (e) => console.warn('map resource issue (non-fatal):', e && e.error && e.error.message));
 
   wireSidebarCollapse();
   wireSectionCollapse();
+  wireLegendCollapse();
   map.on('load', async () => {
     await onLoad(map);
     updateHash(map);
@@ -194,7 +196,7 @@ async function setupContours(map) {
   map.addSource('contour-src', {
     type: 'vector',
     tiles: [state.demSource.contourProtocolUrl({
-      thresholds: { 11: [10, 50], 13: [5, 25], 15: [1, 5] },
+      thresholds: { 11: [10, 50], 13: [2, 10], 15: [1, 5] },
       elevationKey: 'ele', levelKey: 'level', contourLayer: 'contours',
     })],
     maxzoom: 15,
@@ -251,7 +253,7 @@ function isobathStyle(map, id) {
     id: 'isobath-label', type: 'symbol', source: id,
     layout: { 'symbol-placement': 'line', 'symbol-spacing': 220,
       'text-field': ['concat', ['to-string', ['get', 'depth_m']], ' m'], 'text-font': ['Noto Sans Regular'], 'text-size': 9 },
-    paint: { 'text-color': depthRamp('depth_m'), 'text-halo-color': '#04263a', 'text-halo-width': 1.4 },
+    paint: { 'text-color': '#eafaff', 'text-halo-color': '#04263a', 'text-halo-width': 1.6 },
   });
 }
 
@@ -288,8 +290,9 @@ async function loadSites(map) {
   applySites(map);
 }
 // visitors never see features flagged hidden:true; admin sees everything
+// (unless previewing as a visitor — see isEffectiveAdmin())
 function sitesForDisplay() {
-  const feats = (state.sites.features || []).filter((f) => state.adminMode || f.properties.hidden !== true);
+  const feats = (state.sites.features || []).filter((f) => isEffectiveAdmin() || f.properties.hidden !== true);
   return fc(feats);
 }
 function applySites(map) {
@@ -384,7 +387,7 @@ function renderToggles(map) {
   box3d.innerHTML = '';
   box.innerHTML = '';
   LAYER_DEFS.forEach((d) => {
-    const visitorHidden = !state.adminMode && state.layerConfig[d.key] === false;
+    const visitorHidden = !isEffectiveAdmin() && state.layerConfig[d.key] === false;
     if (visitorHidden) return;
     const row = document.createElement('label');
     row.className = 'toggle';
@@ -781,6 +784,26 @@ function wireSidebarCollapse() {
 }
 
 /* ============================================================
+ * LEGEND COLLAPSE — same persisted-preference pattern as
+ * wireSidebarCollapse(), applied to the bottom-right depth legend.
+ * Collapsed state shrinks the panel to just its header chip rather
+ * than hiding it entirely.
+ * ========================================================== */
+function wireLegendCollapse() {
+  const legend = document.querySelector('.legend');
+  const header = document.getElementById('legend-head');
+  if (!legend || !header) return;
+  const apply = (collapsed) => {
+    legend.classList.toggle('collapsed', collapsed);
+    try { localStorage.setItem('legend-collapsed', collapsed ? '1' : '0'); } catch { /* ignore */ }
+  };
+  header.onclick = () => apply(!legend.classList.contains('collapsed'));
+  let start = false;
+  try { start = localStorage.getItem('legend-collapsed') === '1'; } catch { /* ignore */ }
+  apply(start);
+}
+
+/* ============================================================
  * SECTION COLLAPSE — persist open/closed state of the native
  * <details> sidebar sections (Layers, Reefs & dive sites) across
  * reloads, same convention as wireSidebarCollapse() above.
@@ -810,11 +833,20 @@ function wireSectionCollapse() {
  * export-to-commit. No backend; edits are session-local until the
  * owner exports the file and commits it.
  * ========================================================== */
+// True only when the admin is unlocked AND not currently previewing as a
+// visitor. Layer-visibility and hidden-site gates should check THIS, never
+// state.adminMode directly, so "Preview as visitor" can simulate the public
+// view without actually logging out. The admin link/panel itself is NOT
+// gated by this — it must stay reachable so Euan can exit preview.
+function isEffectiveAdmin() { return state.adminMode && !state.previewAsVisitor; }
+
 function wireAdmin(map) {
   const link = document.getElementById('admin-link');
   link.onclick = () => toggleAdmin(map);
   if (state.adminMode) renderAdminPanel(map);
   refreshAdminLink();
+  const bannerExit = document.getElementById('preview-banner-exit');
+  if (bannerExit) bannerExit.onclick = () => togglePreviewAsVisitor(map);
 }
 function refreshAdminLink() {
   const link = document.getElementById('admin-link');
@@ -833,8 +865,24 @@ async function toggleAdmin(map) {
   applySites(map);         // admin now sees hidden sites too
   renderAdminPanel(map);
 }
+// Purely a rendering/visibility simulation: no sessionStorage change, no
+// actual logout, ADMIN_HASH/password flow untouched. Re-renders toggles and
+// sites so isEffectiveAdmin()'s new value takes effect immediately, then
+// refreshes the admin panel (button label) and the top-center banner.
+function togglePreviewAsVisitor(map) {
+  state.previewAsVisitor = !state.previewAsVisitor;
+  renderToggles(map);
+  applySites(map);
+  renderAdminPanel(map);
+  const banner = document.getElementById('preview-banner');
+  if (banner) banner.classList.toggle('hidden', !state.previewAsVisitor);
+}
+
 function lockAdmin(map) {
   state.adminMode = false;
+  state.previewAsVisitor = false; // reset so the next unlock doesn't inherit a stale preview state
+  const banner = document.getElementById('preview-banner');
+  if (banner) banner.classList.add('hidden');
   try { sessionStorage.removeItem('sb-admin'); } catch { /* ignore */ }
   const panel = document.getElementById('admin-panel');
   panel.classList.add('hidden'); panel.innerHTML = '';
@@ -852,7 +900,10 @@ function renderAdminPanel(map) {
   panel.innerHTML = `
     <div class="section-title" style="margin-top:6px">Admin mode</div>
     <div class="note">Edits apply to <b>this browser session only</b>. To publish them, Export the file and commit it to the repo.</div>
-    <div class="admin-actions"><button id="admin-lock" class="btn">Lock</button></div>
+    <div class="admin-actions">
+      <button id="admin-preview" class="btn">${state.previewAsVisitor ? 'Exit preview (back to admin)' : 'Preview as visitor'}</button>
+      <button id="admin-lock" class="btn">Lock</button>
+    </div>
 
     <div class="section-title">Dive sites — rename &amp; show/hide</div>
     <div id="admin-sites" class="admin-list"></div>
@@ -888,6 +939,7 @@ function renderAdminPanel(map) {
     lbox.appendChild(row);
   });
 
+  panel.querySelector('#admin-preview').onclick = () => togglePreviewAsVisitor(map);
   panel.querySelector('#admin-lock').onclick = () => lockAdmin(map);
   panel.querySelector('#export-sites').onclick = () => download('dive_sites.geojson', JSON.stringify(state.sites, null, 2));
   panel.querySelector('#export-config').onclick = () => {

@@ -51,10 +51,18 @@
     #map { position:absolute; inset:0; }
 
     .panel { position:absolute; background:var(--panel); border:1px solid var(--edge);
-      border-radius:var(--radius); padding:10px 12px; backdrop-filter:blur(6px); box-shadow:var(--shadow); }
+      border-radius:var(--radius); padding:10px 12px; backdrop-filter:blur(6px); box-shadow:var(--shadow);
+      /* MapLibre's own controls (nav/scale/attribution) set explicit z-index:2, which paints
+         above any z-index:auto element regardless of DOM order — without this our panels could
+         end up hidden behind them (surfaced by the legend's collapsed chip sinking into the
+         same corner as the attribution control). Keep all app panels above every native control. */
+      z-index:3; }
 
     /* ---- sidebar ---- */
-    #sidebar { top:12px; left:12px; width:256px; max-height:calc(100% - 24px);
+    /* max-height leaves a bottom gutter (not just the top 24px inset) so a long site list
+       can't grow the panel down into the scale bar's bottom-left corner; overflow:auto
+       already scrolls the sidebar's own content within that cap. */
+    #sidebar { top:12px; left:12px; width:256px; max-height:calc(100% - 90px);
       overflow:auto; transition:transform .28s cubic-bezier(.4,0,.2,1), opacity .22s ease; }
     #sidebar.collapsed { transform:translateX(-118%); opacity:0; pointer-events:none; }
     .sb-head { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--sp-2); }
@@ -127,19 +135,44 @@
     .admin-actions { display:flex; gap:6px; flex-wrap:wrap; margin:var(--sp-1) 0 var(--sp-2); }
 
     /* ---- readout ---- */
-    #readout { bottom:12px; left:12px; font-variant-numeric:tabular-nums; }
+    #readout { bottom:8px; left:50%; transform:translateX(-50%); font-variant-numeric:tabular-nums;
+      padding:5px 10px; font-size:var(--fs-xs); background:var(--panel); opacity:.72; transition:opacity .15s; }
+    #readout:hover { opacity:1; }
     #readout .k { color:var(--ink-faint); font-size:var(--fs-xs); text-transform:uppercase; letter-spacing:.08em; }
     #readout button { margin-top:6px; }
 
     /* ---- legend ---- */
     .legend { bottom:12px; right:12px; width:172px; }
-    .legend .lt { font-size:var(--fs-sm); font-weight:600; }
+    .legend .lt { font-size:var(--fs-sm); font-weight:600; display:flex; align-items:center; justify-content:space-between;
+      cursor:pointer; user-select:none; }
+    /* Same convention as .sec's chevron: pointing down = expanded, pointing right = collapsed. */
+    .legend .lt .chev { width:10px; height:10px; flex:none; margin-left:6px; transition:transform .16s ease; transform:rotate(90deg); }
+    .legend .lt .chev path { stroke:currentColor; }
+    .legend.collapsed .lt .chev { transform:rotate(0deg); }
+    .legend.collapsed { width:auto; }
+    .legend.collapsed .legend-body { display:none; }
     .legend .bar { height:11px; border-radius:3px; margin:6px 0 3px;
       background:linear-gradient(90deg,
         var(--depth-120) 0%, var(--depth-60) 50%, var(--depth-30) 75%,
         var(--depth-10) 91.7%, var(--depth-0) 100%); box-shadow:0 0 0 1px #0006 inset; }
     .legend .row { display:flex; justify-content:space-between; font-size:var(--fs-xs); color:var(--ink-dim); }
     .legend .foot { font-size:10px; color:var(--ink-faint); margin-top:5px; line-height:1.3; }
+
+    /* ---- scale control (MapLibre-native, restyled to match dark theme) ---- */
+    .maplibregl-ctrl-bottom-left { margin-bottom: 12px; margin-left: 12px; }
+    .maplibregl-ctrl-scale {
+      background: var(--panel); border: 1px solid var(--edge); color: var(--ink-dim);
+      border-radius: var(--radius-sm); backdrop-filter: blur(6px); font-size: var(--fs-xs);
+      padding: 2px 6px;
+    }
+
+    /* ---- admin preview-as-visitor banner ---- */
+    /* NB: uses :not(.hidden) rather than a bare `display:flex` on #preview-banner
+       because an ID selector's specificity would otherwise beat the shared
+       `.hidden { display:none }` class rule and the banner would never hide. */
+    #preview-banner { top:12px; left:50%; transform:translateX(-50%); z-index:10;
+      align-items:center; gap:10px; }
+    #preview-banner:not(.hidden) { display:flex; }
 
     /* ---- popups ---- */
     .maplibregl-popup-content { background:var(--panel-solid); color:var(--ink); border:1px solid #2e5a90;
@@ -165,6 +198,11 @@
 </head>
 <body>
   <div id="map"></div>
+
+  <div id="preview-banner" class="panel hidden">
+    <span>Viewing as a public visitor</span>
+    <button id="preview-banner-exit" class="btn">Exit preview</button>
+  </div>
 
   <button id="sb-open" class="panel iconbtn" hidden title="Show panel" aria-label="Show panel">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
@@ -212,10 +250,12 @@
   </div>
 
   <div class="legend panel">
-    <div class="lt">Depth (m)</div>
-    <div class="bar"></div>
-    <div class="row"><span>−120</span><span>−60</span><span>0</span></div>
-    <div class="foot">Colour-relief DEM &amp; CGS isobaths share this blue→cyan depth scale. Land renders transparent.</div>
+    <div class="lt" id="legend-head">Depth (m)<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></div>
+    <div class="legend-body">
+      <div class="bar"></div>
+      <div class="row"><span>−120</span><span>−60</span><span>0</span></div>
+      <div class="foot">Colour-relief DEM &amp; CGS isobaths share this blue→cyan depth scale. Land renders transparent.</div>
+    </div>
   </div>
 
   <div id="route-hud" class="panel hidden" style="top:12px; left:50%; transform:translateX(-50%);">
