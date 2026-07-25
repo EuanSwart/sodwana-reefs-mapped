@@ -1,1339 +1,1336 @@
-/* Sodwana Bay bathymetry web app — dependency-free (MapLibre GL v5 global + maplibre-contour).
- * No API keys, no build step. Loads local terrarium raster-dem tiles when present.
- * Depth convention: seafloor negative metres. */
+/* Sodwana Bay Bathymetry - map application. Author: Euan Swart. */
+(function () {
+  'use strict';
 
-import {
-  haversineKm, bearingDeg, totalKm, routeLegs,
-  ACCURACY_BANDS, bandForDepth, sampleRouteProfile, formatRouteReport,
-} from './route.js';
+  var MINUS = String.fromCharCode(0x2212);   // proper minus sign
+  var AOI = [32.62, -27.62, 32.82, -27.32];
+  var CENTER = [32.72, -27.47];
+  var TILE_MINZOOM = 8, TILE_MAXZOOM = 15;
+  var USER_SITES_KEY = 'sodwana-user-sites-v1';
+  var OFFICIAL_ID = 'official';
 
-const AOI = { lonMin: 32.62, lonMax: 32.82, latMin: -27.62, latMax: -27.32 };
-const CENTER = [(AOI.lonMin + AOI.lonMax) / 2, (AOI.latMin + AOI.latMax) / 2];
-
-/* ============================================================
- * DESIGN TOKENS — single source of truth for layer colours.
- * These mirror the CSS custom properties in index.html. Change
- * here + there together for the categorical (site/reef/track/etc.)
- * colours; the depth ramp below is a special case — see its comment.
- * ========================================================== */
-const C = {
-  // Depth ramp for isobaths (blue -> cyan). Shares the -60/-30/-10 mid stops
-  // with style.json's color-relief DEM ramp, but the endpoints differ ON
-  // PURPOSE, not by drift: CGS isobaths only span 0..-95 m (vs. the DEM's
-  // full -120..0 m range), so anchoring at -95 uses the ramp's full contrast
-  // over the data that actually exists; and the 0 m stop is pale cyan
-  // (#aef2ff) rather than style.json's pure white so isobath lines/labels
-  // stay legible drawn over the map instead of disappearing into glare.
-  // index.html's --depth-* legend tokens are a third, separately-tuned copy
-  // (legend swatch legibility against the dark panel) — if you change the
-  // core blue/cyan hues, update all three, but don't force the endpoints
-  // to match; they're context-specific by design.
-  depth: [[-95, '#02103f'], [-60, '#001f7a'], [-30, '#0077ff'], [-10, '#00e5ff'], [0, '#aef2ff']],
-  site: '#ffd400', siteUnverified: '#ff9f6b',
-  reefProminent: '#c1440e', reef: '#e8722c', reefScattered: '#f2b134',
-  sedCoarse: '#b9a67d', sedSand: '#e3d7b4',
-  track: '#63e6c0', prospect: '#ff5db1', prospectOk: '#4dff88', entry: '#5ad1ff',
-  ink: '#dfeaff', inkDim: '#8fb3e0', halo: '#0a1830', edge: '#0a1424',
-  accent: '#00e5ff', // mirrors --accent in index.html's :root
-};
-// depth_m -> colour interpolation expression, reused by isobaths (and available to future depth layers)
-function depthRamp(prop) {
-  const expr = ['interpolate', ['linear'], ['get', prop]];
-  for (const [d, c] of C.depth) expr.push(d, c);
-  return expr;
-}
-
-/* ============================================================
- * LAYER REGISTRY — drives sidebar toggle rendering, wiring, and
- * the admin visitor-visibility picker. One list, no duplication.
- * ========================================================== */
-const LAYER_DEFS = [
-  { key: '3d',        label: '3D terrain',             def: false, kind: 'terrain' },
-  { key: 'fusion1',   label: 'Fusion1 model (0–300 m)', def: false, kind: 'demswap', sw: '#00e5ff' },
-  { key: 'relief',    label: 'Depth colour',           def: true,  sw: 'var(--depth-30)' },
-  { key: 'hill',      label: 'Hillshade',              def: true,  sw: '#8aa0bf' },
-  { key: 'contour',   label: 'Contours',               def: true,  sw: '#bfe9ff' },
-  { key: 'sites',     label: 'Dive sites',             def: true,  sw: 'var(--c-site)' },
-  { key: 'tracks',    label: 'ICESat-2 tracks',        def: false, sw: 'var(--c-track)' },
-  { key: 'prospects', label: 'Prospect leads',         def: false, sw: 'var(--c-prospect)' },
-  { key: 'geology',   label: 'Seafloor geology (CGS)', def: true,  sw: 'var(--c-reef)' },
-  { key: 'isobaths',  label: 'CGS isobaths',           def: true,  sw: 'var(--depth-10)' },
-  { key: 'entries',   label: 'Dive entry points',      def: false, sw: 'var(--c-entry)' },
-  { key: 'measure',   label: 'Measure distance',       def: false, kind: 'measure' },
-  { key: 'route',     label: 'Plan route',             def: false, kind: 'route' },
-  { key: 'scale',     label: 'Scale bar',              def: true,  kind: 'scale' },
-];
-// which map layers each toggle key controls
-const VIS = {
-  relief: ['color-relief'], hill: ['hillshade'],
-  contour: ['contour-lines', 'contour-labels'],
-  sites: ['sites-dot', 'sites-label'], tracks: ['tracks-line'],
-  prospects: ['prospects-dot'], geology: ['geology-fill', 'geology-line'],
-  isobaths: ['isobath-line', 'isobath-label'], entries: ['entries-dot'],
-};
-
-/* ============================================================
- * ADMIN AUTH (client-side only — static $0 site, no backend).
- * ADMIN_HASH is the SHA-256 of the admin password. Default password
- * is "sodwana" — CHANGE IT by regenerating the hash. In a browser
- * console or Node:
- *   (async p => [...new Uint8Array(await crypto.subtle.digest(
- *     'SHA-256', new TextEncoder().encode(p)))]
- *     .map(x => x.toString(16).padStart(2,'0')).join(''))('YOUR-PASSWORD')
- * Paste the result below and commit. Only the hash lives in the repo;
- * the password itself is never stored anywhere.
- * ========================================================== */
-const ADMIN_HASH = 'daca69b7c5b72a8a68a5884a118d3176593827173a232f1c284eeeb5a0d6b50a';
-async function sha256(str) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-  return [...new Uint8Array(buf)].map((x) => x.toString(16).padStart(2, '0')).join('');
-}
-
-/* ---------- app state ---------- */
-const state = {
-  map: null,
-  sites: fc([]),            // master dive-site FeatureCollection (edited in-memory by admin)
-  layerConfig: {},          // key -> visitor-visible bool (from data/layer_config.json)
-  toggleState: {},          // key -> checked bool (live UI state, survives re-render)
-  adminMode: false,
-  previewAsVisitor: false,  // admin-only: simulate the visitor view without logging out
-  scaleControl: null,       // maplibregl.ScaleControl instance, so we can show/hide its DOM element
-  demSource: null,          // maplibre-contour DemSource (also used to sample route depth profiles)
-  demSourceF1: null,        // maplibre-contour DemSource for the Fusion1 DEM (deep contours)
-  activeDem: 'terrain-dem', // which raster-dem drives relief/hillshade/3D ('terrain-dem' | 'fusion1-dem')
-  fusion1: false,           // Fusion1 (0–300 m) DEM mode active?
-  lastRoute: null,          // { wp, legsResult, profile } — last confirmed route, for summary export
-  selectedSiteIds: new Set(), // admin: site.properties.id values checked for "export selected"
-  expandedSiteId: null,       // admin: which site row's edit form is open (one at a time)
-};
-LAYER_DEFS.forEach((d) => { state.toggleState[d.key] = d.def; });
-
-/* ---------- boot ---------- */
-function bootstrap() {
-  if (!window.maplibregl) { setTimeout(bootstrap, 60); return; }
-  start();
-}
-window.__mlReady = bootstrap;
-bootstrap();
-
-async function start() {
-  const h = location.hash.replace(/^#/, '').split('/').map(Number);
-  const startView = (h.length === 3 && h.every(Number.isFinite))
-    ? { zoom: h[0], center: [h[2], h[1]] }
-    : { zoom: 11.5, center: CENTER };
-
-  const map = new maplibregl.Map({
-    container: 'map', style: 'style.json',
-    center: startView.center, zoom: startView.zoom,
-    maxBounds: [[AOI.lonMin - 0.3, AOI.latMin - 0.3], [AOI.lonMax + 0.3, AOI.latMax + 0.3]],
-    hash: false,
-  });
-  state.map = map;
-  window.__mlmap = map;
-  map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
-  state.scaleControl = new maplibregl.ScaleControl({ unit: 'metric' });
-  map.addControl(state.scaleControl, 'bottom-left');
-  map.on('error', (e) => console.warn('map resource issue (non-fatal):', e && e.error && e.error.message));
-
-  wireSidebarCollapse();
-  wireSectionCollapse();
-  wireLegendCollapse();
-  map.on('load', async () => {
-    await onLoad(map);
-    updateHash(map);
-    map.on('moveend', () => updateHash(map));
-  });
-}
-
-function lonLatToTile(lon, lat, z) {
-  const n = 2 ** z;
-  const x = Math.floor((lon + 180) / 360 * n);
-  const y = Math.floor((1 - Math.asinh(Math.tan(lat * Math.PI / 180)) / Math.PI) / 2 * n);
-  return { x, y };
-}
-
-async function onLoad(map) {
-  const zc = 12, tc = lonLatToTile(CENTER[0], CENTER[1], zc);
-  const tilesPresent = await head(`tiles/xyz/${zc}/${tc.x}/${tc.y}.png`);
-  document.getElementById('data-note').innerHTML = tilesPresent
-    ? 'DEM tiles loaded.'
-    : '⚠ DEM tiles not built yet — run <code>pipeline/07_make_tiles.py</code>. Basemap, markers &amp; tools still work.';
-
-  // visitor layer availability (missing file / missing key => visible)
-  state.layerConfig = (await getJSON('data/layer_config.json')) || {};
-
-  await setupContours(map);
-  await loadVector(map, 'data/cgs_geology.geojson', 'geology', geologyStyle);
-  await loadVector(map, 'data/cgs_isobaths.geojson', 'isobaths', isobathStyle);
-  await loadVector(map, 'data/dive_entries.geojson', 'entries', entryStyle);
-  await loadSites(map);
-  await loadVector(map, 'data/icesat2_tracks.geojson', 'tracks', trackStyle);
-  await loadVector(map, 'data/prospects.geojson', 'prospects', prospectStyle);
-
-  state.adminMode = sessionStorage.getItem('sb-admin') === '1';
-  renderToggles(map);
-  wireCoordinates(map);
-  initMeasure(map);
-  initRoute(map);
-  wireRouteButtons(map);
-  wireAdmin(map);
-}
-
-/* ---------- terrain / 3D ---------- */
-function set3D(map, on, ex) {
-  const dem = state.activeDem || 'terrain-dem';
-  if (on) { if (!map.getSource(dem)) return; map.setTerrain({ source: dem, exaggeration: ex }); }
-  else { map.setTerrain(null); }
-}
-
-/* ---------- contours ---------- */
-async function setupContours(map) {
-  if (!map.getSource('terrain-dem')) return;
-  let mlcontour;
-  try { mlcontour = (await import('./vendor/index.mjs')).default; }
-  catch {
-    try { mlcontour = (await import('https://unpkg.com/maplibre-contour@0.1.0/dist/index.mjs')).default; }
-    catch (e) { console.warn('maplibre-contour unavailable; contours disabled', e); return; }
-  }
-  const tilesBase = new URL('tiles/xyz/', location.href).href;
-  // Kept on state (not a local) so the Plan Route tool can reuse it to sample
-  // the fused DEM along a route (route.js sampleRouteProfile -> getDemTile).
-  state.demSource = new mlcontour.DemSource({ url: tilesBase + '{z}/{x}/{y}.png', encoding: 'terrarium', maxzoom: 15, worker: true });
-  state.demSource.setupMaplibre(maplibregl);
-  map.addSource('contour-src', {
-    type: 'vector',
-    tiles: [state.demSource.contourProtocolUrl({
-      thresholds: { 11: [10, 50], 13: [2, 10], 15: [1, 5] },
-      elevationKey: 'ele', levelKey: 'level', contourLayer: 'contours',
-    })],
-    maxzoom: 15,
-    bounds: [AOI.lonMin, AOI.latMin, AOI.lonMax, AOI.latMax],
-  });
-  map.addLayer({
-    id: 'contour-lines', type: 'line', source: 'contour-src', 'source-layer': 'contours',
-    paint: { 'line-color': '#bfe9ff', 'line-opacity': ['match', ['get', 'level'], 1, 0.9, 0.35], 'line-width': ['match', ['get', 'level'], 1, 1.1, 0.5] },
-  });
-  map.addLayer({
-    id: 'contour-labels', type: 'symbol', source: 'contour-src', 'source-layer': 'contours',
-    filter: ['>', ['get', 'level'], 0],
-    layout: { 'symbol-placement': 'line', 'text-field': ['concat', ['number-format', ['get', 'ele'], {}], ' m'], 'text-font': ['Noto Sans Regular'], 'text-size': 10 },
-    paint: { 'text-color': '#eafaff', 'text-halo-color': '#0a1830', 'text-halo-width': 1.2 },
-  });
-
-  // Fusion1 deep contours (0 → -300 m) — shown only when the Fusion1 DEM is active.
-  try {
-    const f1Base = new URL('tiles_fusion1/xyz/', location.href).href;
-    state.demSourceF1 = new mlcontour.DemSource({ url: f1Base + '{z}/{x}/{y}.png', encoding: 'terrarium', maxzoom: 15, worker: true });
-    state.demSourceF1.setupMaplibre(maplibregl);
-    map.addSource('fusion1-contour-src', {
-      type: 'vector',
-      tiles: [state.demSourceF1.contourProtocolUrl({
-        thresholds: { 10: [50, 100], 12: [20, 100], 14: [10, 50], 15: [5, 25] },
-        elevationKey: 'ele', levelKey: 'level', contourLayer: 'contours',
-      })],
-      maxzoom: 15,
-      bounds: [AOI.lonMin, AOI.latMin, AOI.lonMax, AOI.latMax],
+  // ADMIN_HASH is the SHA-256 of the admin password. Only the hash lives in this file;
+  // the password itself is never stored anywhere. To change it, run in a console:
+  //   (async p => [...new Uint8Array(await crypto.subtle.digest('SHA-256',
+  //     new TextEncoder().encode(p)))].map(x => x.toString(16).padStart(2,'0')).join(''))('newpass')
+  var ADMIN_HASH = 'daca69b7c5b72a8a68a5884a118d3176593827173a232f1c284eeeb5a0d6b50a';
+  function sha256(str) {
+    return crypto.subtle.digest('SHA-256', new TextEncoder().encode(str)).then(function (buf) {
+      return Array.prototype.map.call(new Uint8Array(buf), function (x) { return x.toString(16).padStart(2, '0'); }).join('');
     });
-    map.addLayer({
-      id: 'fusion1-contour-lines', type: 'line', source: 'fusion1-contour-src', 'source-layer': 'contours',
-      layout: { visibility: 'none' },
-      paint: { 'line-color': '#bfe9ff', 'line-opacity': ['match', ['get', 'level'], 1, 0.9, 0.35], 'line-width': ['match', ['get', 'level'], 1, 1.1, 0.5] },
+  }
+
+  function depthLabel(m) {
+    if (m === null || m === undefined || !isFinite(m)) return MINUS;
+    var v = Math.round(m * 10) / 10;
+    if (v > 0) return MINUS + '0.0 m';
+    return MINUS + Math.abs(v).toFixed(1) + ' m';
+  }
+  function fmtLL(lng, lat) { return lat.toFixed(4) + ', ' + lng.toFixed(4); }
+  function byId(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
     });
-    map.addLayer({
-      id: 'fusion1-contour-labels', type: 'symbol', source: 'fusion1-contour-src', 'source-layer': 'contours',
-      filter: ['>', ['get', 'level'], 0],
-      layout: { visibility: 'none', 'symbol-placement': 'line', 'text-field': ['concat', ['number-format', ['get', 'ele'], {}], ' m'], 'text-font': ['Noto Sans Regular'], 'text-size': 10 },
-      paint: { 'text-color': '#eafaff', 'text-halo-color': '#0a1830', 'text-halo-width': 1.2 },
+  }
+  function fc(features) { return { type: 'FeatureCollection', features: features }; }
+  function downloadBlob(filename, mime, content) {
+    var blob = new Blob([content], { type: mime });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+  function uid() { return 'id' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+
+  var style = {
+    version: 8,
+    name: 'Sodwana Bay',
+    sources: {
+      relief: {
+        type: 'raster',
+        tiles: ['tiles/relief/{z}/{x}/{y}.png'],
+        tileSize: 256, minzoom: TILE_MINZOOM, maxzoom: TILE_MAXZOOM, bounds: AOI,
+        attribution: 'Sodwana Bay Bathymetry | Euan Swart'
+      },
+      terrain: {
+        type: 'raster-dem',
+        tiles: ['tiles/terrain/{z}/{x}/{y}.png'],
+        tileSize: 256, minzoom: TILE_MINZOOM, maxzoom: TILE_MAXZOOM, bounds: AOI,
+        encoding: 'terrarium'
+      },
+      contours: { type: 'geojson', data: 'data/contours.geojson' },
+      cgs_geology: { type: 'geojson', data: 'data/cgs_geology.geojson' },
+      dive_sites: { type: 'geojson', data: fc([]) },
+      icesat2: { type: 'geojson', data: 'data/icesat2_tracks.geojson' },
+      prospects: { type: 'geojson', data: 'data/prospects.geojson' },
+      dive_entries: { type: 'geojson', data: 'data/dive_entries.geojson' },
+      user_sites: { type: 'geojson', data: fc([]) },
+      measure_src: { type: 'geojson', data: fc([]) },
+      route_src: { type: 'geojson', data: fc([]) }
+    },
+    layers: [
+      { id: 'bg', type: 'background', paint: { 'background-color': '#070d15' } },
+      { id: 'relief', type: 'raster', source: 'relief',
+        paint: { 'raster-opacity': 1, 'raster-resampling': 'linear' } },
+      { id: 'geology-fill', type: 'fill', source: 'cgs_geology',
+        layout: { visibility: 'none' },
+        paint: {
+          'fill-color': ['match', ['get', 'geology'],
+            'Prominent Reef', '#c1440e', 'Reef', '#e8722c', 'Scattered Reef', '#f2b134',
+            'Coarse Shelly Sediment', '#b9a67d', 'Sand', '#e3d7b4', '#9aa7b0'],
+          'fill-opacity': ['interpolate', ['linear'], ['zoom'], 9, 0.08, 12, 0.28, 15, 0.42]
+        } },
+      { id: 'geology-line', type: 'line', source: 'cgs_geology',
+        layout: { visibility: 'none' },
+        paint: { 'line-color': '#00121f', 'line-width': 0.3, 'line-opacity': 0.4 } },
+      { id: 'contour-waiver', type: 'line', source: 'contours',
+        filter: ['==', ['get', 'confident'], 0],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#93c6d6', 'line-opacity': 0.42, 'line-dasharray': [2, 2.2],
+          'line-width': ['interpolate', ['linear'], ['zoom'],
+            10, ['case', ['==', ['get', 'emphasis'], 1], 1.2, 0.6],
+            15, ['case', ['==', ['get', 'emphasis'], 1], 2.4, 1.1]]
+        } },
+      { id: 'contour-confident', type: 'line', source: 'contours',
+        filter: ['all', ['==', ['get', 'confident'], 1], ['==', ['get', 'emphasis'], 0]],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#bfe9f2', 'line-opacity': 0.5,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 0.5, 15, 1.1]
+        } },
+      { id: 'contour-emphasis', type: 'line', source: 'contours',
+        filter: ['all', ['==', ['get', 'confident'], 1], ['==', ['get', 'emphasis'], 1]],
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': '#e2f6fb', 'line-opacity': 0.82,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 10, 1.3, 15, 2.6]
+        } },
+      { id: 'icesat2-line', type: 'line', source: 'icesat2',
+        layout: { visibility: 'none', 'line-cap': 'round' },
+        paint: { 'line-color': '#39e6ff', 'line-opacity': 0.7,
+          'line-width': ['interpolate', ['linear'], ['zoom'], 9, 0.6, 15, 1.8] } },
+      { id: 'entries-circle', type: 'circle', source: 'dive_entries',
+        layout: { visibility: 'none' },
+        paint: { 'circle-radius': 2.6, 'circle-color': '#5ad1ff', 'circle-opacity': 0.4,
+          'circle-stroke-color': '#052a3a', 'circle-stroke-width': 0.4 } },
+      { id: 'prospects-circle', type: 'circle', source: 'prospects',
+        layout: { visibility: 'none' },
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['get', 'score'], 0, 4, 10, 11],
+          'circle-color': ['case', ['==', ['get', 'cgs_corroborated'], true], '#4dff88', '#ff5db1'],
+          'circle-opacity': 0.6, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1
+        } },
+      { id: 'dive-circle', type: 'circle', source: 'dive_sites',
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 3.5, 15, 7],
+          'circle-color': ['case', ['==', ['get', 'verified'], false], '#ffb238', '#35c2d6'],
+          'circle-stroke-color': '#ffffff',
+          'circle-stroke-width': 1.6, 'circle-opacity': 0.95
+        } },
+      { id: 'user-circle', type: 'circle', source: 'user_sites',
+        paint: {
+          'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 3.5, 15, 7],
+          'circle-color': '#ffb238', 'circle-stroke-color': '#7a3f00',
+          'circle-stroke-width': 1.6, 'circle-opacity': 0.95
+        } },
+      { id: 'measure-line', type: 'line', source: 'measure_src', filter: ['==', '$type', 'LineString'],
+        paint: { 'line-color': '#35c2d6', 'line-width': 2, 'line-dasharray': [2, 1.4] } },
+      { id: 'measure-pts', type: 'circle', source: 'measure_src', filter: ['==', '$type', 'Point'],
+        paint: { 'circle-radius': 4, 'circle-color': '#35c2d6' } },
+      { id: 'route-line', type: 'line', source: 'route_src', filter: ['==', '$type', 'LineString'],
+        paint: { 'line-color': '#4dff88', 'line-width': 3, 'line-opacity': 0.95 } },
+      { id: 'route-pts', type: 'circle', source: 'route_src', filter: ['==', '$type', 'Point'],
+        paint: { 'circle-radius': 5, 'circle-color': '#ffffff', 'circle-stroke-color': '#4dff88', 'circle-stroke-width': 2 } }
+    ]
+  };
+
+  var map = new maplibregl.Map({
+    container: 'map', style: style, center: CENTER, zoom: 12,
+    minZoom: 8, maxZoom: 17, maxPitch: 75, pitch: 0, bearing: 0,
+    maxBounds: [[AOI[0] - 0.15, AOI[1] - 0.15], [AOI[2] + 0.15, AOI[3] + 0.15]],
+    attributionControl: false, hash: true
+  });
+  window.__map = map;
+
+  map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
+  map.addControl(new maplibregl.ScaleControl({ maxWidth: 110, unit: 'metric' }), 'bottom-left');
+  map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+
+  var state = {
+    exag: 1.5, is3d: false, contours: true, sites: true, geology: false,
+    adminMode: false, previewAsVisitor: false,
+    layerConfig: {}, officialFC: fc([]),
+  };
+
+  function isEffectiveAdmin() { return state.adminMode && !state.previewAsVisitor; }
+
+  map.on('load', function () {
+    map.setTerrain({ source: 'terrain', exaggeration: 1 });
+    wireLayerToggles();
+    wireDepthReadout();
+    wireGeologyPopups();
+    wireUserSitePopups();
+    wireProspectPopups();
+    fetch('data/layer_config.json').then(function (r) { return r.ok ? r.json() : {}; }).catch(function () { return {}; })
+      .then(function (cfg) {
+        state.layerConfig = cfg || {};
+        state.adminMode = (function () { try { return sessionStorage.getItem('sb-admin') === '1'; } catch (e) { return false; } })();
+        renderVisitorGating();
+        buildDiveLabels();
+        refreshUserSitesSource();
+        wireAdmin();
+        initMeasure();
+        initRoute();
+      });
+    map.on('moveend', updateContourLabels);
+    map.on('zoom', refreshSiteLabels);
+    updateContourLabels();
+  });
+
+  function setVis(ids, on) {
+    ids.forEach(function (id) {
+      if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none');
     });
-  } catch (e) { console.warn('Fusion1 contours unavailable', e); }
-}
-
-/* ---------- vector overlays ---------- */
-async function loadVector(map, url, id, styler, after) {
-  const gj = await getJSON(url);
-  if (!gj) return;
-  map.addSource(id, { type: 'geojson', data: gj });
-  styler(map, id);
-  if (after) after(map, gj);
-}
-
-// Substrate fill reads as an accent ON the depth colour, not a wash OVER it: reef classes
-// (the diagnostically useful "where's the actual reef" signal) get a saturated, zoom-growing
-// fill; Sand/Coarse Shelly Sediment (the "nothing to see here" substrate that just repeats
-// what the pale depth colour already implies) get a near-transparent wash so they don't mud
-// the blue-cyan ramp underneath. An unrecognised class renders invisible (no grey fallback
-// wash) rather than a muddy default.
-function geologyStyle(map, id) {
-  const fillOpacity = ['match', ['get', 'geology'],
-    'Prominent Reef', ['interpolate', ['linear'], ['zoom'], 9, 0.22, 12, 0.4, 15, 0.55],
-    'Reef', ['interpolate', ['linear'], ['zoom'], 9, 0.18, 12, 0.34, 15, 0.48],
-    'Scattered Reef', ['interpolate', ['linear'], ['zoom'], 9, 0.14, 12, 0.26, 15, 0.38],
-    'Coarse Shelly Sediment', ['interpolate', ['linear'], ['zoom'], 9, 0.03, 14, 0.1],
-    'Sand', ['interpolate', ['linear'], ['zoom'], 9, 0.02, 14, 0.07],
-    0];
-  map.addLayer({
-    id: 'geology-fill', type: 'fill', source: id,
-    paint: {
-      'fill-opacity': fillOpacity,
-      'fill-color': ['match', ['get', 'geology'],
-        'Prominent Reef', C.reefProminent, 'Reef', C.reef, 'Scattered Reef', C.reefScattered,
-        'Coarse Shelly Sediment', C.sedCoarse, 'Sand', C.sedSand, 'transparent'],
-    },
-  });
-  // Reef-class boundaries get a visible glow line (the actionable edges divers care about);
-  // sediment classes get a hairline only, present but not competing with the depth contours.
-  map.addLayer({ id: 'geology-line', type: 'line', source: id,
-    paint: {
-      'line-color': ['match', ['get', 'geology'],
-        'Prominent Reef', C.reefProminent, 'Reef', C.reef, 'Scattered Reef', C.reefScattered, '#00121f'],
-      'line-width': ['match', ['get', 'geology'],
-        'Prominent Reef', 0.9, 'Reef', 0.7, 'Scattered Reef', 0.5, 0.25],
-      'line-opacity': ['match', ['get', 'geology'],
-        'Prominent Reef', 0.85, 'Reef', 0.7, 'Scattered Reef', 0.55, 0.3],
-    } });
-  map.on('click', 'geology-fill', (e) => {
-    new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>CGS substrate</b><br>${esc(e.features[0].properties.geology)}`).addTo(map);
-  });
-}
-
-function isobathStyle(map, id) {
-  // CGS 2005 survey isobaths — coloured by depth on the shared blue->cyan scale.
-  // Multiples of 25 m drawn thicker as index contours.
-  map.addLayer({ id: 'isobath-line', type: 'line', source: id,
-    paint: {
-      'line-color': depthRamp('depth_m'),
-      'line-width': ['case', ['==', ['%', ['get', 'depth_m'], 25], 0], 1.5, 0.7],
-      'line-opacity': 0.85,
-    } });
-  map.addLayer({
-    id: 'isobath-label', type: 'symbol', source: id,
-    layout: { 'symbol-placement': 'line', 'symbol-spacing': 220,
-      'text-field': ['concat', ['to-string', ['get', 'depth_m']], ' m'], 'text-font': ['Noto Sans Regular'], 'text-size': 9 },
-    paint: { 'text-color': '#eafaff', 'text-halo-color': '#04263a', 'text-halo-width': 1.6 },
-  });
-}
-
-function entryStyle(map, id) {
-  map.addLayer({ id: 'entries-dot', type: 'circle', source: id, layout: { visibility: 'none' },
-    paint: { 'circle-radius': 3, 'circle-color': C.entry, 'circle-opacity': 0.35, 'circle-stroke-color': C.halo, 'circle-stroke-width': 0.4 } });
-}
-
-function trackStyle(map, id) {
-  map.addLayer({ id: 'tracks-line', type: 'line', source: id, layout: { visibility: 'none' },
-    paint: { 'line-color': C.track, 'line-width': 1, 'line-opacity': 0.7 } });
-}
-
-function prospectStyle(map, id) {
-  map.addLayer({
-    id: 'prospects-dot', type: 'circle', source: id, layout: { visibility: 'none' },
-    paint: {
-      'circle-radius': ['interpolate', ['linear'], ['get', 'score'], 0, 4, 10, 11],
-      'circle-color': ['case', ['==', ['get', 'cgs_corroborated'], true], C.prospectOk, C.prospect],
-      'circle-opacity': 0.6, 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1,
-    },
-  });
-  map.on('click', 'prospects-dot', (e) => prospectPopup(map, e.features[0]));
-  map.on('mouseenter', 'prospects-dot', () => (map.getCanvas().style.cursor = 'pointer'));
-  map.on('mouseleave', 'prospects-dot', () => (map.getCanvas().style.cursor = ''));
-}
-
-/* ---------- dive sites (admin-editable) ---------- */
-async function loadSites(map) {
-  const gj = await getJSON('data/dive_sites.geojson');
-  state.sites = gj || fc([]);
-  ensureSiteIds();
-  map.addSource('sites', { type: 'geojson', data: sitesForDisplay() });
-  diveSiteStyle(map, 'sites');
-  applySites(map);
-}
-// Every site gets a stable client-side id (not just its array index, which shifts on
-// import/delete) so the "export selected" checkbox state survives a re-render.
-function ensureSiteIds() {
-  (state.sites.features || []).forEach((f) => {
-    if (!f.properties.id) f.properties.id = genId();
-  });
-}
-function genId() { return 'site_' + Math.random().toString(36).slice(2, 10); }
-// visitors never see features flagged hidden:true; admin sees everything
-// (unless previewing as a visitor — see isEffectiveAdmin())
-function sitesForDisplay() {
-  const feats = (state.sites.features || []).filter((f) => isEffectiveAdmin() || f.properties.hidden !== true);
-  return fc(feats);
-}
-function applySites(map) {
-  if (map.getSource('sites')) map.getSource('sites').setData(sitesForDisplay());
-  buildSiteList(map);
-}
-
-function diveSiteStyle(map, id) {
-  map.addLayer({
-    id: 'sites-dot', type: 'circle', source: id,
-    paint: {
-      'circle-radius': 5,
-      'circle-color': ['case', ['==', ['get', 'verified'], false], C.siteUnverified, C.site],
-      'circle-opacity': ['case', ['==', ['get', 'hidden'], true], 0.4, 1],
-      'circle-stroke-color': C.halo, 'circle-stroke-width': 1.5,
-    },
-  });
-  map.addLayer({
-    id: 'sites-label', type: 'symbol', source: id,
-    layout: {
-      'text-field': ['get', 'name'], 'text-font': ['Noto Sans Regular'], 'text-size': 11,
-      'text-offset': [0, 1.1], 'text-anchor': 'top',
-    },
-    paint: { 'text-color': '#ffffff', 'text-halo-color': C.halo, 'text-halo-width': 1.2 },
-  });
-  map.on('click', 'sites-dot', (e) => sitePopup(map, e.features[0]));
-  map.on('mouseenter', 'sites-dot', () => (map.getCanvas().style.cursor = 'pointer'));
-  map.on('mouseleave', 'sites-dot', () => (map.getCanvas().style.cursor = ''));
-}
-
-/* ---------- popups ---------- */
-function sitePopup(map, f) {
-  const p = f.properties, [lon, lat] = f.geometry.coordinates;
-  const depth = (p.depth_min_m != null) ? `${p.depth_min_m} to ${p.depth_max_m} m` : '—';
-  const unver = (p.verified === false || p.verified === 'false');
-  const dives = (p.n_dives) ? `<br>${p.n_dives} logged dive(s)` : '';
-  const alt = (p.alt_names) ? `<br><small>also: ${esc(p.alt_names)}</small>` : '';
-  const html = `<b>${esc(p.name)}</b>${unver ? ' <i style="color:#ff9f6b">(unverified)</i>' : ''}<br>
-    Depth: ${depth}${dives}${alt}<br>${p.description ? esc(p.description) + '<br>' : ''}
-    <code>${lat.toFixed(5)}, ${lon.toFixed(5)}</code><br>
-    <button onclick="navigator.clipboard.writeText('${lat.toFixed(6)}, ${lon.toFixed(6)}')">Copy decimal</button>
-    <button onclick="navigator.clipboard.writeText('${ddm(lat, lon)}')">Copy DDM</button>
-    <button onclick="window.open('https://www.google.com/maps?q=${lat},${lon}','_blank')">Google Maps</button>`;
-  new maplibregl.Popup({ maxWidth: '260px' }).setLngLat([lon, lat]).setHTML(html).addTo(map);
-}
-
-function prospectPopup(map, f) {
-  const p = f.properties, [lon, lat] = f.geometry.coordinates;
-  const sub = p.cgs_substrate ? `<br>CGS substrate: <b>${esc(p.cgs_substrate)}</b>` : '';
-  const html = `<b>Prospect lead #${p.rank ?? '?'}</b> · score ${p.score}<br>
-    ~${p.mean_depth_m} m · ${p.km_from_known_site} km from nearest known site${sub}<br>
-    <i>${esc(p.confidence || 'lead — ground-truth before diving')}</i><br>
-    <code>${lat.toFixed(5)}, ${lon.toFixed(5)}</code><br>
-    <button onclick="navigator.clipboard.writeText('${ddm(lat, lon)}')">Copy DDM</button>`;
-  new maplibregl.Popup({ maxWidth: '260px' }).setLngLat([lon, lat]).setHTML(html).addTo(map);
-}
-
-/* ---------- reef sidebar list ---------- */
-function buildSiteList(map) {
-  const ul = document.getElementById('site-list');
-  ul.innerHTML = '';
-  (sitesForDisplay().features || []).forEach((f) => {
-    const p = f.properties, [lon, lat] = f.geometry.coordinates;
-    const li = document.createElement('li');
-    if (p.verified === false) li.className = 'unverified';
-    const depth = (p.depth_min_m != null) ? `${p.depth_min_m}–${p.depth_max_m} m` : '';
-    li.innerHTML = `<span class="nm">${esc(p.name)}</span><span class="d">${depth}</span>`;
-    li.onclick = () => {
-      map.flyTo({ center: [lon, lat], zoom: 14, pitch: 60, bearing: -20, duration: 2000 });
-      const t3 = document.getElementById('t-3d');
-      if (t3 && !t3.checked) { t3.checked = true; state.toggleState['3d'] = true; set3D(map, true, exVal()); syncEx(); }
-      setTimeout(() => sitePopup(map, f), 2100);
-    };
-    ul.appendChild(li);
-  });
-}
-
-/* ============================================================
- * SIDEBAR TOGGLES — rendered from LAYER_DEFS + layerConfig.
- * ========================================================== */
-function renderToggles(map) {
-  // #exwrap (the 3D exaggeration slider) is a STATIC sibling in index.html —
-  // it sits between #toggle-3d and #toggles and is never appended/moved here,
-  // so clearing these two containers on re-render can never destroy it.
-  // (Previously #exwrap was appendChild'd INTO #toggles, which meant the next
-  // box.innerHTML='' deleted it and the following appendChild(getElementById
-  // ('exwrap')) threw on null — that crash made renderToggles() non-
-  // idempotent and broke the admin-unlock path. Keep #exwrap out of any
-  // container this function clears.)
-  const box3d = document.getElementById('toggle-3d');
-  const box = document.getElementById('toggles');
-  box3d.innerHTML = '';
-  box.innerHTML = '';
-  LAYER_DEFS.forEach((d) => {
-    const visitorHidden = !isEffectiveAdmin() && state.layerConfig[d.key] === false;
-    if (visitorHidden) return;
-    const row = document.createElement('label');
-    row.className = 'toggle';
-    row.htmlFor = 't-' + d.key;
-    const swatch = d.sw ? `<span class="sw" style="background:${d.sw}"></span>` : '<span class="sw" style="background:transparent;box-shadow:none"></span>';
-    row.innerHTML = `<input type="checkbox" id="t-${d.key}">${swatch}<span>${d.label}</span>`;
-    // 3D row renders into its own tiny container so the (static) exaggeration
-    // slider that sits right after it in the markup stays visually attached.
-    (d.key === '3d' ? box3d : box).appendChild(row);
-    const cb = row.querySelector('input');
-    cb.checked = !!state.toggleState[d.key];
-    cb.onchange = () => applyToggle(map, d, cb.checked);
-  });
-  // apply current state to the map so re-renders don't desync visibility
-  LAYER_DEFS.forEach((d) => applyToggle(map, d, !!state.toggleState[d.key], true));
-  syncEx();
-  wireEx(map);
-}
-
-function applyToggle(map, d, on, silent) {
-  state.toggleState[d.key] = on;
-  if (d.kind === 'terrain') {
-    set3D(map, on, exVal());
-    const ew = document.getElementById('exwrap');
-    if (ew) ew.hidden = !on;
-  } else if (d.kind === 'measure') {
-    setMeasure(map, on);
-  } else if (d.kind === 'route') {
-    setRoute(map, on);
-  } else if (d.kind === 'scale') {
-    setScale(on);
-  } else if (d.kind === 'demswap') {
-    state.fusion1 = on;
-    state.activeDem = on ? 'fusion1-dem' : 'terrain-dem';
-    refreshDemLayers(map);
-    if (state.toggleState['3d']) set3D(map, true, exVal());
-  } else if (d.key === 'relief' || d.key === 'hill' || d.key === 'contour') {
-    refreshDemLayers(map);
-  } else {
-    (VIS[d.key] || []).forEach((id) => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none'));
   }
-}
-
-// Keep the depth-colour, hillshade and contour layers pointed at whichever DEM is
-// active (baseline terrain-dem, or the Fusion1 0–300 m model), honouring each layer's
-// own on/off toggle.
-function refreshDemLayers(map) {
-  const vis = (id, v) => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', v ? 'visible' : 'none');
-  const f = !!state.fusion1;
-  const reliefOn = state.toggleState['relief'] !== false;
-  const hillOn = state.toggleState['hill'] !== false;
-  const contourOn = state.toggleState['contour'] !== false;
-  vis('color-relief', !f && reliefOn); vis('fusion1-relief', f && reliefOn);
-  vis('hillshade', !f && hillOn); vis('fusion1-hill', f && hillOn);
-  // HD 5 m reef inset draws on top within its bounds when Fusion1 is active
-  vis('fusion1hd-relief', f && reliefOn); vis('fusion1hd-hill', f && hillOn);
-  vis('contour-lines', !f && contourOn); vis('contour-labels', !f && contourOn);
-  vis('fusion1-contour-lines', f && contourOn); vis('fusion1-contour-labels', f && contourOn);
-}
-
-function exVal() { const el = document.getElementById('ex'); return el ? parseFloat(el.value) : 1.6; }
-function syncEx() { const s = document.getElementById('exval'); if (s) s.textContent = exVal().toFixed(1) + '×'; }
-function wireEx(map) {
-  const ex = document.getElementById('ex');
-  if (!ex || ex.__wired) return;
-  ex.__wired = true;
-  ex.oninput = () => { syncEx(); if (state.toggleState['3d']) set3D(map, true, exVal()); };
-}
-
-/* ---------- coordinate UX ---------- */
-function wireCoordinates(map) {
-  const cur = document.getElementById('cursor');
-  map.on('mousemove', (e) => { cur.textContent = `lat ${e.lngLat.lat.toFixed(5)}, lon ${e.lngLat.lng.toFixed(5)}`; });
-  let marker = null;
-  map.on('click', (e) => {
-    if (window.__measuring || window.__routing) return;
-    const { lat, lng } = e.lngLat;
-    if (marker) marker.remove();
-    marker = new maplibregl.Marker({ color: C.accent }).setLngLat([lng, lat]).addTo(map);
-    document.getElementById('clicked').innerHTML = `<code>${lat.toFixed(6)}, ${lng.toFixed(6)}</code><br>${ddm(lat, lng)}`;
-    const btn = document.getElementById('copybtn');
-    btn.hidden = false;
-    btn.onclick = () => navigator.clipboard.writeText(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
-  });
-}
-
-/* ---------- distance measure ---------- */
-function initMeasure(map) {
-  const pts = [];
-  const srcId = 'measure-src';
-  window.__measureReset = () => { pts.length = 0; if (map.getSource(srcId)) map.getSource(srcId).setData(fc([])); };
-  map.on('click', (e) => {
-    if (!window.__measuring) return;
-    pts.push([e.lngLat.lng, e.lngLat.lat]);
-    if (!map.getSource(srcId)) {
-      map.addSource(srcId, { type: 'geojson', data: fc([]) });
-      map.addLayer({ id: 'measure-line', type: 'line', source: srcId, paint: { 'line-color': '#00e5ff', 'line-width': 2, 'line-dasharray': [2, 1] } });
-      map.addLayer({ id: 'measure-pts', type: 'circle', source: srcId, filter: ['==', '$type', 'Point'], paint: { 'circle-radius': 4, 'circle-color': '#00e5ff' } });
-    }
-    const feats = pts.map((p) => ({ type: 'Feature', geometry: { type: 'Point', coordinates: p } }));
-    if (pts.length > 1) {
-      feats.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: pts } });
-      const dd = totalKm(pts), b = bearingDeg(pts[pts.length - 2], pts[pts.length - 1]);
-      document.getElementById('clicked').innerHTML = `${(dd * 1000).toFixed(0)} m total · last leg bearing ${b.toFixed(0)}°`;
-    }
-    map.getSource(srcId).setData(fc(feats));
-  });
-}
-function setMeasure(map, on) {
-  window.__measuring = on;
-  // Mutual exclusion: Measure and Plan Route are both global click-capture
-  // modes; only one may be active. Turning Measure on forces Route off.
-  if (on && window.__routing) {
-    const rEntry = LAYER_DEFS.find((d) => d.key === 'route');
-    const rcb = document.getElementById('t-route');
-    if (rcb) rcb.checked = false;
-    if (rEntry) applyToggle(map, rEntry, false);
+  function wireLayerToggles() {
+    byId('t-relief').addEventListener('change', function (e) { setVis(['relief'], e.target.checked); });
+    byId('t-contours').addEventListener('change', function (e) {
+      state.contours = e.target.checked;
+      setVis(['contour-waiver', 'contour-confident', 'contour-emphasis'], state.contours);
+      updateContourLabels();
+    });
+    byId('t-sites').addEventListener('change', function (e) {
+      state.sites = e.target.checked;
+      setVis(['dive-circle'], state.sites);
+      refreshSiteLabels();
+    });
+    byId('t-user-sites').addEventListener('change', function (e) { setVis(['user-circle'], e.target.checked); });
+    byId('t-entries').addEventListener('change', function (e) { setVis(['entries-circle'], e.target.checked); });
+    byId('t-prospects').addEventListener('change', function (e) { setVis(['prospects-circle'], e.target.checked); });
+    byId('t-lidar').addEventListener('change', function (e) { setVis(['icesat2-line'], e.target.checked); });
+    byId('t-geology').addEventListener('change', function (e) {
+      state.geology = e.target.checked;
+      setVis(['geology-fill', 'geology-line'], state.geology);
+    });
+    byId('t-3d').addEventListener('change', function (e) { set3D(e.target.checked); });
+    byId('exag').addEventListener('input', function (e) {
+      state.exag = parseFloat(e.target.value);
+      byId('exag-val').innerHTML = state.exag.toFixed(1) + '&times;';
+      if (state.is3d) map.setTerrain({ source: 'terrain', exaggeration: state.exag });
+    });
   }
-  if (!on && window.__measureReset) window.__measureReset();
-  map.getCanvas().style.cursor = on ? 'crosshair' : '';
-}
-
-/* ---------- scale bar ---------- */
-function setScale(on) {
-  const el = document.querySelector('.maplibregl-ctrl-scale');
-  if (el) el.style.display = on ? '' : 'none';
-}
-
-/* ============================================================
- * PLAN ROUTE — click a polyline of waypoints, sample the fused DEM
- * along it (route.js), and produce a dive-planning summary + report.
- * Mirrors the measure tool's structure: a global __routing flag, a
- * single click handler that only acts when routing, waypoints in a
- * module array, lazily-created GeoJSON source+layers, full setData()
- * redraw on every click. All depth logic lives in route.js.
- * ========================================================== */
-let routeWp = []; // [lon,lat] waypoints in click order (module scope: shared by route fns)
-
-function initRoute(map) {
-  const srcId = 'route-src';
-  window.__routingReset = () => {
-    routeWp = [];
-    if (map.getSource(srcId)) map.getSource(srcId).setData(fc([]));
-    updateRouteHud();
-  };
-  map.on('click', (e) => {
-    if (!window.__routing) return;
-    routeWp.push([e.lngLat.lng, e.lngLat.lat]);
-    rebuildRouteLayers(map, routeWp);
-    updateRouteHud();
-  });
-}
-
-function rebuildRouteLayers(map, wp) {
-  const srcId = 'route-src';
-  if (!map.getSource(srcId)) {
-    map.addSource(srcId, { type: 'geojson', data: fc([]) });
-    // Solid accent line — deliberately distinct from the measure tool's
-    // dashed cyan (#00e5ff) line so the two modes never read as the same.
-    map.addLayer({ id: 'route-line', type: 'line', source: srcId, filter: ['==', '$type', 'LineString'],
-      paint: { 'line-color': C.prospectOk, 'line-width': 3, 'line-opacity': 0.95 } });
-    map.addLayer({ id: 'route-pts', type: 'circle', source: srcId, filter: ['==', '$type', 'Point'],
-      paint: { 'circle-radius': 5, 'circle-color': '#ffffff', 'circle-stroke-color': C.prospectOk, 'circle-stroke-width': 2 } });
-    map.addLayer({ id: 'route-num', type: 'symbol', source: srcId, filter: ['==', '$type', 'Point'],
-      layout: { 'text-field': ['to-string', ['get', 'n']], 'text-font': ['Noto Sans Regular'], 'text-size': 11, 'text-offset': [0, -1.4] },
-      paint: { 'text-color': '#eafaff', 'text-halo-color': C.halo, 'text-halo-width': 1.4 } });
-  }
-  const feats = wp.map((p, i) => ({ type: 'Feature', properties: { n: i + 1 }, geometry: { type: 'Point', coordinates: p } }));
-  if (wp.length > 1) feats.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: wp } });
-  map.getSource(srcId).setData(fc(feats));
-}
-
-function updateRouteHud() {
-  const stats = document.getElementById('route-hud-stats');
-  if (stats) stats.textContent = `${routeWp.length} point${routeWp.length === 1 ? '' : 's'} · ${Math.round(totalKm(routeWp) * 1000)} m`;
-  const confirm = document.getElementById('route-confirm');
-  if (confirm) confirm.disabled = routeWp.length < 2;
-}
-
-function setRoute(map, on) {
-  window.__routing = on;
-  const hud = document.getElementById('route-hud');
-  const summary = document.getElementById('route-summary');
-  if (on) {
-    // Mutual exclusion: turning Route on forces Measure off.
-    if (window.__measuring) {
-      const mEntry = LAYER_DEFS.find((d) => d.key === 'measure');
-      const mcb = document.getElementById('t-measure');
-      if (mcb) mcb.checked = false;
-      if (mEntry) applyToggle(map, mEntry, false);
-    }
-    if (hud) hud.classList.remove('hidden');
-    if (summary) summary.classList.add('hidden');
-    if (window.__routingReset) window.__routingReset(); // start clean
-  } else {
-    if (window.__routingReset) window.__routingReset();
-    if (hud) hud.classList.add('hidden');
-    if (summary) summary.classList.add('hidden');
-  }
-  map.getCanvas().style.cursor = on ? 'crosshair' : '';
-}
-
-function wireRouteButtons(map) {
-  const routeEntry = () => LAYER_DEFS.find((d) => d.key === 'route');
-  const exitRoute = () => {
-    const cb = document.getElementById('t-route');
-    if (cb) cb.checked = false;
-    applyToggle(map, routeEntry(), false);
-  };
-  const cancel = document.getElementById('route-cancel');
-  if (cancel) cancel.onclick = () => exitRoute();
-  const confirm = document.getElementById('route-confirm');
-  if (confirm) confirm.onclick = async () => {
-    if (routeWp.length < 2) return;
-    await openRouteSummary(map, routeWp.slice());
-  };
-  const close = document.getElementById('route-summary-close');
-  if (close) close.onclick = () => {
-    document.getElementById('route-summary').classList.add('hidden');
-    exitRoute(); // Close behaves like Cancel (per design), just after a summary was shown
-  };
-  const exportBtn = document.getElementById('route-summary-export');
-  if (exportBtn) exportBtn.onclick = () => {
-    if (!state.lastRoute) return;
-    const { wp, legsResult, profile } = state.lastRoute;
-    const ta = document.getElementById('route-export-text');
-    ta.value = formatRouteReport(wp, legsResult, profile);
-    ta.hidden = false;
-    const copy = document.getElementById('route-export-copy');
-    if (copy) copy.hidden = false;
-  };
-  const copyBtn = document.getElementById('route-export-copy');
-  if (copyBtn) copyBtn.onclick = () => navigator.clipboard.writeText(document.getElementById('route-export-text').value);
-}
-
-async function openRouteSummary(map, wp) {
-  const legsResult = routeLegs(wp);
-  // sampleRouteProfile never throws (per route.js contract); a missing
-  // demSource just yields all-null depths, not a crash.
-  const profile = await sampleRouteProfile(state.demSource, wp);
-  state.lastRoute = { wp: wp.slice(), legsResult, profile };
-
-  const body = document.getElementById('route-summary-body');
-  if (body) body.innerHTML = buildRouteSummaryHTML(wp, legsResult, profile);
-  const ta = document.getElementById('route-export-text');
-  if (ta) { ta.hidden = true; ta.value = ''; }
-  const copy = document.getElementById('route-export-copy');
-  if (copy) copy.hidden = true;
-
-  document.getElementById('route-hud').classList.add('hidden');
-  document.getElementById('route-summary').classList.remove('hidden');
-}
-
-// One depth reading (signed negative metres) with its confidence-band tag.
-function depthReadingHTML(reading) {
-  if (!reading || reading.depthM == null) return 'no data (land / outside coverage)';
-  const b = reading.band;
-  const tag = b ? ` <small style="color:var(--ink-faint)">${esc(b.label)} — ${esc(b.status)}</small>` : '';
-  return `${reading.depthM.toFixed(1)} m${tag}`;
-}
-
-function buildRouteSummaryHTML(wp, legsResult, profile) {
-  const stats = profile && profile.stats;
-  const P = [];
-
-  // Entry point (decimal + DDM, matching the coordinate-pin readout style)
-  const [elon, elat] = wp[0];
-  P.push('<div class="section-title" style="margin-top:0">Entry point</div>');
-  P.push(`<div><code>${elat.toFixed(6)}, ${elon.toFixed(6)}</code><br>${ddm(elat, elon)}</div>`);
-
-  // Waypoint list
-  P.push(`<div class="section-title">Waypoints (${wp.length})</div>`);
-  P.push('<ol style="margin:2px 0 0;padding-left:20px;font-variant-numeric:tabular-nums;">');
-  wp.forEach((pt) => P.push(`<li><code>${pt[0].toFixed(6)}, ${pt[1].toFixed(6)}</code></li>`));
-  P.push('</ol>');
-
-  // Honesty warning banner when the route enters lower-confidence depth bands
-  const crossed = (profile && profile.bandsCrossed) || [];
-  if (crossed.includes('optical-wall') || crossed.includes('coarse')) {
-    const bandObj = ACCURACY_BANDS.find((b) => b.key !== 'validated' && crossed.includes(b.key));
-    const statusTxt = bandObj ? bandObj.status : 'lower confidence beyond 15 m';
-    P.push(`<div style="margin-top:10px;padding:7px 9px;border:1px solid var(--c-prospect);border-radius:var(--radius-sm);background:#2a0e22;color:var(--ink);font-size:var(--fs-sm);">
-      &#9888; This route passes deeper than 15 m. Depths beyond 15 m are lower-confidence — ${esc(statusTxt)}.</div>`);
-  }
-
-  // Depth profile chart
-  P.push('<div class="section-title">Depth profile</div>');
-  P.push(routeProfileSVG(profile));
-
-  // Depth summary (signed negative values, each tagged with its band)
-  P.push('<div class="section-title">Depth summary</div>');
-  if (stats) {
-    P.push('<div style="line-height:1.7;">');
-    P.push(`Entry: ${depthReadingHTML(stats.entry)}<br>`);
-    if (stats.max && stats.max.depthM != null) {
-      P.push(`Deepest: ${depthReadingHTML(stats.max)} <small style="color:var(--ink-faint)">(at ${Math.round(stats.max.dM)} m along route)</small><br>`);
+  function set3D(on) {
+    state.is3d = on;
+    byId('exag-row').hidden = !on;
+    if (on) {
+      map.setTerrain({ source: 'terrain', exaggeration: state.exag });
+      map.easeTo({ pitch: 62, duration: 700 });
     } else {
-      P.push('Deepest: no data (land / outside coverage)<br>');
+      map.setTerrain({ source: 'terrain', exaggeration: 1 });
+      map.easeTo({ pitch: 0, bearing: 0, duration: 700 });
     }
-    P.push(`Average: ${stats.avg && stats.avg.depthM != null ? stats.avg.depthM.toFixed(1) + ' m' : 'no data (land / outside coverage)'}<br>`);
-    P.push(`Exit: ${depthReadingHTML(stats.exit)}<br>`);
-    P.push(`<small style="color:var(--ink-faint)">${stats.validCount}/${stats.sampleCount} samples had depth data</small>`);
-    P.push('</div>');
-  } else {
-    P.push('<div class="note">No depth profile available.</div>');
   }
 
-  // Per-leg breakdown
-  const legs = (legsResult && legsResult.legs) || [];
-  P.push('<div class="section-title">Legs</div>');
-  if (legs.length) {
-    P.push('<div style="font-variant-numeric:tabular-nums;line-height:1.6;">');
-    legs.forEach((leg) => {
-      P.push(`Leg ${leg.index}: heading ${String(Math.round(leg.bearingDeg)).padStart(3, '0')}°, distance ${Math.round(leg.distanceM)} m<br>`);
+  // ---- Visitor layer gating: a layer's toggle row is hidden from non-admins when
+  // layer_config.json marks it false. Admin always sees every toggle. ----
+  function renderVisitorGating() {
+    var KEYMAP = { relief: 't-relief', contours: 't-contours', sites: 't-sites', 'user-sites': 't-user-sites',
+      entries: 't-entries', prospects: 't-prospects', lidar: 't-lidar', geology: 't-geology', '3d': 't-3d' };
+    Object.keys(KEYMAP).forEach(function (key) {
+      var input = byId(KEYMAP[key]);
+      if (!input) return;
+      var row = input.closest('.row');
+      var visitorHidden = !isEffectiveAdmin() && state.layerConfig[key] === false;
+      if (row) row.hidden = visitorHidden;
     });
-    P.push(`<b>Total: ${Math.round(legsResult.totalM)} m (${(legsResult.totalM / 1000).toFixed(2)} km)</b>`);
-    P.push('</div>');
-  } else {
-    P.push('<div class="note">Single point — no legs.</div>');
   }
 
-  return P.join('');
-}
+  function wireDepthReadout() {
+    var elDepth = byId('ro-depth'), elLL = byId('ro-ll'), pending = null;
+    function update(lngLat) {
+      var el = null;
+      try { el = map.queryTerrainElevation(lngLat, { exaggerated: false }); } catch (err) { el = null; }
+      if (el !== null && el !== undefined && isFinite(el) && el < 5 && el > -2500) {
+        elDepth.textContent = 'Depth: ' + depthLabel(el);
+      } else {
+        elDepth.textContent = 'Depth: ' + MINUS;
+      }
+      elLL.textContent = fmtLL(lngLat.lng, lngLat.lat);
+    }
+    function schedule(lngLat) {
+      if (pending) cancelAnimationFrame(pending);
+      pending = requestAnimationFrame(function () { pending = null; update(lngLat); });
+    }
+    map.on('mousemove', function (e) { schedule(e.lngLat); });
+    map.on('click', function (e) {
+      if (window.__measuring || window.__routing) return;
+      update(e.lngLat);
+    });
+  }
 
-/* Pure SVG string (no DOM/map dependency). X = distance along route,
- * Y = depth (0 at top, more negative lower). The plotted line BREAKS at
- * null-depth samples — one polyline per contiguous valid run, coloured by
- * the WORST (highest-uncertainty) band in that run so the chart never
- * overstates confidence. */
-function routeProfileSVG(profile) {
-  const W = 320, H = 168;
-  const plotX0 = 40, plotX1 = 312, plotY0 = 12, plotY1 = 118;
-  const samples = (profile && profile.samples) || [];
-  const totalM = (profile && profile.totalM) || 0;
-  let dataMin = 0;
-  for (const s of samples) if (s.depthM != null && s.depthM < dataMin) dataMin = s.depthM;
-  const yBottom = Math.min(-25, dataMin); // most-negative Y bound (at least -25 m)
-  const xFor = (dM) => (totalM > 0 ? plotX0 + (dM / totalM) * (plotX1 - plotX0) : (plotX0 + plotX1) / 2);
-  const yFor = (d) => plotY0 + (yBottom !== 0 ? (0 - d) / (0 - yBottom) : 0) * (plotY1 - plotY0);
+  function sitePopupHtml(p) {
+    var dmin = parseFloat(p.depth_min_m), dmax = parseFloat(p.depth_max_m), depthStr;
+    if (isFinite(dmin) && isFinite(dmax)) {
+      depthStr = (dmin === dmax) ? depthLabel(dmax)
+        : depthLabel(Math.min(dmin, dmax)) + ' to ' + depthLabel(Math.max(dmin, dmax));
+    } else { depthStr = MINUS; }
+    var html = '<div class="site-pop"><h3>' + esc(p.name) + '</h3>' +
+      '<div class="depth">' + depthStr + '</div>';
+    if (p.description) html += '<p class="desc">' + esc(p.description) + '</p>';
+    var meta = [];
+    if (p.alt_names) meta.push('Also: ' + esc(p.alt_names));
+    if (p.n_dives) meta.push(esc(p.n_dives) + ' logged dive(s)');
+    if (p.collection) meta.push(esc(p.collection));
+    if (meta.length) html += '<p class="meta">' + meta.join(' &middot; ') + '</p>';
+    html += '</div>';
+    return html;
+  }
 
-  // Band -> colour. Cool for validated, warmer as confidence drops (caution
-  // reads better than the near-invisible dark-blue end of --depth-* on the
-  // dark panel). --depth-10 kept for the validated tier.
-  const bandColor = { validated: 'var(--depth-10)', 'optical-wall': '#ffb020', coarse: '#ff5db1' };
-  const bandIdx = (k) => ACCURACY_BANDS.findIndex((b) => b.key === k);
+  function wireDiveSitePopups() {
+    map.on('click', 'dive-circle', function (e) {
+      var f = e.features[0]; if (!f) return;
+      new maplibregl.Popup({ closeButton: true, offset: 12, maxWidth: '260px' })
+        .setLngLat(f.geometry.coordinates.slice()).setHTML(sitePopupHtml(f.properties)).addTo(map);
+    });
+    map.on('mouseenter', 'dive-circle', function () { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', 'dive-circle', function () { map.getCanvas().style.cursor = ''; });
+  }
 
-  const P = [];
-  P.push(`<svg viewBox="0 0 ${W} ${H}" width="100%" style="display:block;margin-top:4px;background:#0a1424;border:1px solid var(--edge);border-radius:6px;">`);
+  function wireGeologyPopups() {
+    map.on('click', 'geology-fill', function (e) {
+      var f = e.features[0]; if (!f) return;
+      var name = f.properties.geology || 'Unclassified';
+      var html = '<div class="site-pop"><h3>CGS substrate</h3>' +
+        '<div class="desc">' + esc(name) + '</div></div>';
+      new maplibregl.Popup({ closeButton: true, offset: 8, maxWidth: '220px' })
+        .setLngLat(e.lngLat).setHTML(html).addTo(map);
+    });
+    map.on('mouseenter', 'geology-fill', function () { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', 'geology-fill', function () { map.getCanvas().style.cursor = ''; });
+  }
 
-  // Y gridlines + labels at 0, -15, -25 (+ route max if deeper than -25)
-  const ticks = [0, -15, -25];
-  if (dataMin < -25) ticks.push(Math.round(dataMin));
-  ticks.forEach((t) => {
-    if (t < yBottom - 0.001) return;
-    const y = yFor(t);
-    P.push(`<line x1="${plotX0}" y1="${y.toFixed(1)}" x2="${plotX1}" y2="${y.toFixed(1)}" stroke="#24406b" stroke-width="0.6"${t === 0 ? '' : ' stroke-dasharray="3 3"'}/>`);
-    P.push(`<text x="${plotX0 - 4}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="#8fb3e0">${t} m</text>`);
+  function wireUserSitePopups() {
+    map.on('click', 'user-circle', function (e) {
+      var f = e.features[0]; if (!f) return;
+      new maplibregl.Popup({ closeButton: true, offset: 12, maxWidth: '260px' })
+        .setLngLat(f.geometry.coordinates.slice()).setHTML(sitePopupHtml(f.properties)).addTo(map);
+    });
+    map.on('mouseenter', 'user-circle', function () { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', 'user-circle', function () { map.getCanvas().style.cursor = ''; });
+  }
+
+  function wireProspectPopups() {
+    map.on('click', 'prospects-circle', function (e) {
+      var f = e.features[0]; if (!f) return;
+      var p = f.properties;
+      var html = '<div class="site-pop"><h3>Prospect lead #' + esc(p.rank) + '</h3>' +
+        '<div class="depth">score ' + esc(p.score) + '</div>' +
+        '<p class="desc">~' + esc(p.mean_depth_m) + ' m &middot; ' + esc(p.km_from_known_site) + ' km from nearest known site' +
+        (p.cgs_substrate && p.cgs_substrate !== 'unknown' ? '<br>CGS substrate: <b>' + esc(p.cgs_substrate) + '</b>' : '') + '</p>' +
+        '<p class="meta">' + esc(p.confidence || 'lead - ground-truth before diving') + '</p></div>';
+      new maplibregl.Popup({ closeButton: true, offset: 8, maxWidth: '240px' })
+        .setLngLat(f.geometry.coordinates.slice()).setHTML(html).addTo(map);
+    });
+    map.on('mouseenter', 'prospects-circle', function () { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', 'prospects-circle', function () { map.getCanvas().style.cursor = ''; });
+  }
+
+  var siteMarkers = [];
+  var officialFC = null;   // populated once data/dive_sites.geojson loads; shared with My-sites + Admin
+  function officialForDisplay() {
+    var feats = (officialFC && officialFC.features || []).filter(function (f) {
+      return isEffectiveAdmin() || f.properties.hidden !== true;
+    });
+    return fc(feats);
+  }
+  function applyOfficialSites() {
+    var src = map.getSource('dive_sites');
+    if (src) src.setData(officialForDisplay());
+    rebuildSiteMarkers();
+    renderCollections();
+    renderSiteList();
+    renderAdminSiteList();
+  }
+  function rebuildSiteMarkers() {
+    siteMarkers.forEach(function (m) { m.remove(); });
+    siteMarkers = [];
+    (officialForDisplay().features || []).forEach(function (f) {
+      var el = document.createElement('div');
+      el.className = 'dlbl site';
+      el.textContent = f.properties.name;
+      var m = new maplibregl.Marker({ element: el, anchor: 'top', offset: [0, 7] })
+        .setLngLat(f.geometry.coordinates).addTo(map);
+      siteMarkers.push(m);
+    });
+    refreshSiteLabels();
+  }
+  function buildDiveLabels() {
+    fetch('data/dive_sites.geojson').then(function (r) { return r.json(); }).then(function (loaded) {
+      officialFC = loaded;
+      wireDiveSitePopups();
+      applyOfficialSites();
+    }).catch(function () {});
+  }
+  function refreshSiteLabels() {
+    var show = state.sites && map.getZoom() >= 11;
+    siteMarkers.forEach(function (m) { m.getElement().style.display = show ? '' : 'none'; });
+  }
+
+  var contourMarkers = [];
+  function clearContourLabels() { contourMarkers.forEach(function (m) { m.remove(); }); contourMarkers = []; }
+  function updateContourLabels() {
+    clearContourLabels();
+    if (!state.contours || map.getZoom() < 13) return;
+    var feats;
+    try { feats = map.queryRenderedFeatures({ layers: ['contour-emphasis', 'contour-waiver'] }); }
+    catch (e) { return; }
+    var seen = {}, count = 0;
+    for (var i = 0; i < feats.length && count < 60; i++) {
+      var f = feats[i], p = f.properties;
+      if (p.emphasis != 1) continue;
+      var g = f.geometry; if (!g) continue;
+      var line = g.type === 'MultiLineString' ? g.coordinates[0] : g.coordinates;
+      if (!line || !line.length) continue;
+      var c = line[Math.floor(line.length / 2)];
+      var key = Math.round(p.depth) + '@' + c[0].toFixed(3) + ',' + c[1].toFixed(3);
+      if (seen[key]) continue; seen[key] = 1;
+      var el = document.createElement('div');
+      el.className = 'dlbl depth' + (p.confident == 0 ? ' dim' : '');
+      el.textContent = MINUS + Math.round(Math.abs(p.depth)) + ' m';
+      contourMarkers.push(new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(c).addTo(map));
+      count++;
+    }
+  }
+
+  /* ---------- panel / sheet plumbing ---------- */
+  var panels = { layers: byId('layers'), mysites: byId('mysites'), admin: byId('admin') };
+  var aboutPanel = byId('about'), scrim = byId('scrim');
+  var sheetButtons = { layers: byId('btn-layers'), mysites: byId('btn-mysites'), admin: byId('btn-admin') };
+  function panelKeyFor(panel) {
+    for (var k in panels) if (panels[k] === panel) return k;
+    return null;
+  }
+  function openPanel(panel, useScrim) {
+    panel.hidden = false;
+    if (useScrim) scrim.hidden = false;
+    var key = panelKeyFor(panel);
+    if (key) { sheetButtons[key].setAttribute('aria-expanded', 'true'); sheetButtons[key].classList.add('active'); }
+  }
+  function closePanel(panel) {
+    panel.hidden = true;
+    var key = panelKeyFor(panel);
+    if (key) { sheetButtons[key].setAttribute('aria-expanded', 'false'); sheetButtons[key].classList.remove('active'); }
+    if (aboutPanel.hidden) scrim.hidden = true;
+  }
+  function closeAllSheets(except) {
+    Object.keys(panels).forEach(function (k) { if (panels[k] !== except && !panels[k].hidden) closePanel(panels[k]); });
+  }
+  function toggleSheet(panel) {
+    if (panel.hidden) { closeAllSheets(panel); openPanel(panel, false); }
+    else { closePanel(panel); }
+  }
+  byId('btn-layers').addEventListener('click', function () { toggleSheet(panels.layers); });
+  byId('btn-mysites').addEventListener('click', function () { toggleSheet(panels.mysites); });
+  byId('btn-admin').addEventListener('click', function () { toggleSheet(panels.admin); });
+  byId('layers-close').addEventListener('click', function () { closePanel(panels.layers); });
+  byId('mysites-close').addEventListener('click', function () { closePanel(panels.mysites); });
+  byId('admin-close').addEventListener('click', function () { closePanel(panels.admin); });
+  byId('btn-about').addEventListener('click', function () { openPanel(aboutPanel, true); });
+  byId('about-close').addEventListener('click', function () { closePanel(aboutPanel); });
+  scrim.addEventListener('click', function () { closePanel(aboutPanel); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (!aboutPanel.hidden) { closePanel(aboutPanel); return; }
+    Object.keys(panels).forEach(function (k) { if (!panels[k].hidden) closePanel(panels[k]); });
   });
 
-  // X axis endpoints
-  P.push(`<text x="${plotX0}" y="${plotY1 + 12}" font-size="9" fill="#7e9bc4">0 m</text>`);
-  P.push(`<text x="${plotX1}" y="${plotY1 + 12}" text-anchor="end" font-size="9" fill="#7e9bc4">${Math.round(totalM)} m</text>`);
+  /* ---------- My dive sites: user collections (localStorage only, never touches the shipped Official dataset) ---------- */
 
-  // Contiguous valid runs — one polyline each, broken across null gaps.
-  const runs = [];
-  let cur = null;
-  for (const s of samples) {
-    if (s.depthM == null) { cur = null; continue; }
-    if (!cur) { cur = []; runs.push(cur); }
-    cur.push(s);
+  function loadUserData() {
+    var data = null;
+    try {
+      var raw = localStorage.getItem(USER_SITES_KEY);
+      if (raw) data = JSON.parse(raw);
+    } catch (e) { data = null; }
+    if (!data || !Array.isArray(data.collections)) {
+      data = { version: 1, activeCollectionId: null, collections: [] };
+    }
+    return data;
   }
-  runs.forEach((run) => {
-    let worst = 0;
-    run.forEach((s) => { const i = s.band ? bandIdx(s.band.key) : 0; if (i > worst) worst = i; });
-    const color = bandColor[ACCURACY_BANDS[worst].key] || 'var(--depth-10)';
-    if (run.length === 1) {
-      P.push(`<circle cx="${xFor(run[0].dM).toFixed(1)}" cy="${yFor(run[0].depthM).toFixed(1)}" r="1.8" fill="${color}"/>`);
+  var userData = loadUserData();
+  function saveUserData() {
+    try { localStorage.setItem(USER_SITES_KEY, JSON.stringify(userData)); } catch (e) {}
+  }
+  function findCollection(id) {
+    for (var i = 0; i < userData.collections.length; i++) if (userData.collections[i].id === id) return userData.collections[i];
+    return null;
+  }
+  function findSiteInCollection(col, id) {
+    for (var i = 0; i < col.sites.length; i++) if (col.sites[i].id === id) return col.sites[i];
+    return null;
+  }
+  function selectedCollectionId() { return userData.activeCollectionId || OFFICIAL_ID; }
+  function addTargetCollection() {
+    var id = selectedCollectionId();
+    if (id === OFFICIAL_ID) return null;
+    return findCollection(id);
+  }
+  function uniqueCollectionName(base) {
+    var name = base, n = 2;
+    while (userData.collections.some(function (c) { return c.name === name; })) { name = base + ' (' + n + ')'; n++; }
+    return name;
+  }
+
+  function parseLatLon(latIn, lonIn) {
+    var lat = parseFloat(latIn), lon = parseFloat(lonIn);
+    if (!isFinite(lat) || !isFinite(lon)) return null;
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+    if (lat < AOI[1] - 2 || lat > AOI[3] + 2 || lon < AOI[0] - 2 || lon > AOI[2] + 2) return null;
+    return { lat: lat, lon: lon };
+  }
+  function parseDepth(v) {
+    if (v === undefined || v === null || v === '') return { ok: true, value: null };
+    var n = parseFloat(v);
+    if (!isFinite(n) || n < -1000 || n > 100) return { ok: false, value: null };
+    return { ok: true, value: n };
+  }
+
+  function buildUserFC() {
+    var feats = [];
+    userData.collections.forEach(function (col) {
+      col.sites.forEach(function (s) {
+        feats.push({
+          type: 'Feature',
+          geometry: { type: 'Point', coordinates: [s.lon, s.lat] },
+          properties: {
+            name: s.name, depth_min_m: s.depth_min_m, depth_max_m: s.depth_max_m,
+            description: s.description || '', alt_names: '', collection: col.name
+          }
+        });
+      });
+    });
+    return fc(feats);
+  }
+  function refreshUserSitesSource() {
+    var src = map.getSource('user_sites');
+    if (src) src.setData(buildUserFC());
+  }
+
+  function siteToProps(s) {
+    return { name: s.name, depth_min_m: s.depth_min_m, depth_max_m: s.depth_max_m, description: s.description || '', alt_names: '' };
+  }
+  function currentListSites() {
+    var colId = selectedCollectionId();
+    if (colId === OFFICIAL_ID) {
+      return (officialFC && officialFC.features || []).filter(function (f) { return f.properties.hidden !== true; }).map(function (f, i) {
+        return { id: 'official-' + i, name: f.properties.name, lon: f.geometry.coordinates[0], lat: f.geometry.coordinates[1], props: f.properties, editable: false };
+      });
+    }
+    var col = findCollection(colId);
+    if (!col) return [];
+    return col.sites.map(function (s) {
+      return { id: s.id, name: s.name, lon: s.lon, lat: s.lat, props: siteToProps(s), editable: true };
+    });
+  }
+
+  function renderCollections() {
+    var container = byId('ms-collections');
+    if (!container) return;
+    var sel = selectedCollectionId();
+    var officialCount = (officialFC && officialFC.features && officialFC.features.filter(function (f) { return f.properties.hidden !== true; }).length) || 0;
+    var html = '<div class="ms-col' + (sel === OFFICIAL_ID ? ' active' : '') + '" data-id="' + OFFICIAL_ID + '">' +
+      '<span class="ms-col-name">Official <span class="ms-col-count">(' + officialCount + ')</span></span>' +
+      '<span class="ms-col-badge">read-only</span></div>';
+    userData.collections.forEach(function (col) {
+      html += '<div class="ms-col' + (sel === col.id ? ' active' : '') + '" data-id="' + esc(col.id) + '">' +
+        '<span class="ms-col-name">' + esc(col.name) + ' <span class="ms-col-count">(' + col.sites.length + ')</span></span>' +
+        '<button type="button" class="ms-col-rename" data-id="' + esc(col.id) + '" aria-label="Rename ' + esc(col.name) + '">Rename</button>' +
+        '<button type="button" class="ms-col-del" data-id="' + esc(col.id) + '" aria-label="Delete ' + esc(col.name) + '">Delete</button>' +
+        '</div>';
+    });
+    container.innerHTML = html;
+  }
+
+  var msEditingId = null;
+  function renderSiteList() {
+    var listId = selectedCollectionId();
+    var container = byId('ms-sites'), titleEl = byId('ms-list-title');
+    if (!container) return;
+    var items = currentListSites();
+    var col = findCollection(listId);
+    titleEl.textContent = (listId === OFFICIAL_ID ? 'Official' : (col ? col.name : 'Sites')) + ' (' + items.length + ')';
+    if (!items.length) {
+      container.innerHTML = '<p class="ms-empty">No sites yet.</p>';
+      return;
+    }
+    var html = '';
+    items.forEach(function (s) {
+      var bits = [];
+      var dmin = s.props.depth_min_m, dmax = s.props.depth_max_m;
+      if (dmin !== null && dmin !== undefined && isFinite(dmin)) bits.push(dmin);
+      if (dmax !== null && dmax !== undefined && isFinite(dmax) && dmax !== dmin) bits.push(dmax);
+      var depthStr = bits.length ? bits.map(function (v) { return v + ' m'; }).join(' to ') : MINUS;
+      html += '<div class="ms-site' + (s.editable ? ' editable' : '') + (msEditingId === s.id ? ' editing' : '') + '" data-id="' + esc(s.id) + '">' +
+        '<input type="checkbox" class="ms-site-check" data-id="' + esc(s.id) + '" aria-label="Select ' + esc(s.name) + ' for export" />' +
+        '<span class="ms-site-info"' + (s.editable ? ' tabindex="0" role="button"' : '') + '>' +
+        '<span class="ms-site-name">' + esc(s.name) + '</span>' +
+        '<span class="ms-site-depth">' + esc(depthStr) + '</span></span>' +
+        (s.editable ? '<button type="button" class="ms-site-del" data-id="' + esc(s.id) + '" aria-label="Delete ' + esc(s.name) + '">&times;</button>' : '') +
+        '</div>';
+    });
+    container.innerHTML = html;
+  }
+
+  function updateAddSectionState() {
+    var col = addTargetCollection();
+    var disabled = !col;
+    ['ms-f-name', 'ms-f-lat', 'ms-f-lon', 'ms-f-dmin', 'ms-f-dmax', 'ms-f-desc', 'ms-add-submit'].forEach(function (id) {
+      byId(id).disabled = disabled;
+    });
+    byId('ms-add-hint').hidden = !disabled;
+    if (disabled && msEditingId) resetAddForm();
+  }
+
+  function showAddError(msg) {
+    var el = byId('ms-add-error');
+    if (!msg) { el.hidden = true; el.textContent = ''; return; }
+    el.textContent = msg; el.hidden = false;
+  }
+  function resetAddForm() {
+    msEditingId = null;
+    byId('ms-add-form').reset();
+    byId('ms-add-submit').textContent = 'Add site';
+    byId('ms-add-cancel').hidden = true;
+    showAddError('');
+  }
+  function beginEditSite(site) {
+    msEditingId = site.id;
+    byId('ms-f-name').value = site.name;
+    byId('ms-f-lat').value = site.lat;
+    byId('ms-f-lon').value = site.lon;
+    byId('ms-f-dmin').value = (site.depth_min_m === null || site.depth_min_m === undefined) ? '' : site.depth_min_m;
+    byId('ms-f-dmax').value = (site.depth_max_m === null || site.depth_max_m === undefined) ? '' : site.depth_max_m;
+    byId('ms-f-desc').value = site.description || '';
+    byId('ms-add-submit').textContent = 'Save changes';
+    byId('ms-add-cancel').hidden = false;
+    showAddError('');
+    renderSiteList();
+  }
+  function handleAddSubmit(e) {
+    e.preventDefault();
+    showAddError('');
+    var col = addTargetCollection();
+    if (!col) { showAddError('Select or create a personal collection first.'); return; }
+    var name = byId('ms-f-name').value.trim();
+    if (!name) { showAddError('Name is required.'); return; }
+    var ll = parseLatLon(byId('ms-f-lat').value, byId('ms-f-lon').value);
+    if (!ll) { showAddError('Latitude/longitude missing, non-numeric, or outside the Sodwana Bay area (check you have not swapped lat and lon).'); return; }
+    var dminR = parseDepth(byId('ms-f-dmin').value.trim());
+    if (!dminR.ok) { showAddError('Depth min looks invalid.'); return; }
+    var dmaxR = parseDepth(byId('ms-f-dmax').value.trim());
+    if (!dmaxR.ok) { showAddError('Depth max looks invalid.'); return; }
+    var desc = byId('ms-f-desc').value.trim();
+
+    if (msEditingId) {
+      var site = findSiteInCollection(col, msEditingId);
+      if (!site) { showAddError('Could not find site to edit.'); return; }
+      site.name = name; site.lat = ll.lat; site.lon = ll.lon;
+      site.depth_min_m = dminR.value; site.depth_max_m = dmaxR.value; site.description = desc;
     } else {
-      const pts = run.map((s) => `${xFor(s.dM).toFixed(1)},${yFor(s.depthM).toFixed(1)}`).join(' ');
-      P.push(`<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>`);
+      col.sites.push({ id: uid(), name: name, lat: ll.lat, lon: ll.lon, depth_min_m: dminR.value, depth_max_m: dmaxR.value, description: desc });
     }
-  });
-  if (!runs.length) {
-    P.push(`<text x="${W / 2}" y="${(plotY0 + plotY1) / 2}" text-anchor="middle" font-size="10" fill="#7e9bc4">no depth data along this route</text>`);
+    saveUserData();
+    resetAddForm();
+    refreshUserSitesSource();
+    renderCollections();
+    renderSiteList();
   }
 
-  // Legend
-  let lx = plotX0;
-  const ly = H - 10;
-  ACCURACY_BANDS.forEach((b) => {
-    const col = bandColor[b.key];
-    P.push(`<rect x="${lx}" y="${ly - 8}" width="9" height="9" rx="2" fill="${col}"/>`);
-    P.push(`<text x="${lx + 12}" y="${ly}" font-size="8" fill="#8fb3e0">${b.key}</text>`);
-    lx += 12 + b.key.length * 4.6 + 12;
-  });
-
-  P.push('</svg>');
-  return P.join('');
-}
-
-/* ============================================================
- * SIDEBAR COLLAPSE — UI preference, persisted in localStorage.
- * ========================================================== */
-function wireSidebarCollapse() {
-  const sb = document.getElementById('sidebar');
-  const opener = document.getElementById('sb-open');
-  const collapseBtn = document.getElementById('sb-collapse');
-  const apply = (collapsed) => {
-    sb.classList.toggle('collapsed', collapsed);
-    opener.hidden = !collapsed;
-    try { localStorage.setItem('sb-collapsed', collapsed ? '1' : '0'); } catch { /* ignore */ }
+  /* ---- file import (hand-rolled CSV parser; GeoJSON via JSON.parse) ---- */
+  function parseCSVRows(text) {
+    var rows = [], row = [], field = '', inQuotes = false, i = 0, len = text.length;
+    while (i < len) {
+      var c = text[i];
+      if (inQuotes) {
+        if (c === '"') {
+          if (text[i + 1] === '"') { field += '"'; i += 2; continue; }
+          inQuotes = false; i++; continue;
+        }
+        field += c; i++; continue;
+      } else {
+        if (c === '"') { inQuotes = true; i++; continue; }
+        if (c === ',') { row.push(field); field = ''; i++; continue; }
+        if (c === '\r') { i++; continue; }
+        if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; i++; continue; }
+        field += c; i++; continue;
+      }
+    }
+    row.push(field);
+    if (row.length > 1 || row[0] !== '') rows.push(row);
+    return rows;
+  }
+  var CSV_HEADER_ALIASES = {
+    name: ['name', 'site', 'sitename', 'site_name', 'title'],
+    lat: ['lat', 'latitude', 'y'],
+    lon: ['lon', 'lng', 'long', 'longitude', 'x'],
+    depth_min_m: ['depth_min_m', 'depth_min', 'mindepth', 'min_depth', 'min_depth_m'],
+    depth_max_m: ['depth_max_m', 'depth_max', 'maxdepth', 'max_depth', 'max_depth_m', 'depth', 'depth_m'],
+    description: ['description', 'desc', 'notes', 'note'],
+    collection: ['collection', 'folder', 'group', 'category']
   };
-  collapseBtn.onclick = () => apply(true);
-  opener.onclick = () => apply(false);
-  let start = false;
-  try { start = localStorage.getItem('sb-collapsed') === '1'; } catch { /* ignore */ }
-  apply(start);
-}
-
-/* ============================================================
- * LEGEND COLLAPSE — same persisted-preference pattern as
- * wireSidebarCollapse(), applied to the bottom-right depth legend.
- * Collapsed state shrinks the panel to just its header chip rather
- * than hiding it entirely.
- * ========================================================== */
-function wireLegendCollapse() {
-  const legend = document.querySelector('.legend');
-  const header = document.getElementById('legend-head');
-  if (!legend || !header) return;
-  const apply = (collapsed) => {
-    legend.classList.toggle('collapsed', collapsed);
-    try { localStorage.setItem('legend-collapsed', collapsed ? '1' : '0'); } catch { /* ignore */ }
-  };
-  header.onclick = () => apply(!legend.classList.contains('collapsed'));
-  let start = false;
-  try { start = localStorage.getItem('legend-collapsed') === '1'; } catch { /* ignore */ }
-  apply(start);
-}
-
-/* ============================================================
- * SECTION COLLAPSE — persist open/closed state of the native
- * <details> sidebar sections (Layers, Reefs & dive sites) across
- * reloads, same convention as wireSidebarCollapse() above.
- * ========================================================== */
-function wireSectionCollapse() {
-  const sections = [
-    { id: 'sec-layers', key: 'sb-section-layers' },
-    { id: 'sec-sites', key: 'sb-section-sites' },
-  ];
-  sections.forEach(({ id, key }) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    let openState = true; // default open, matches the `open` attribute already in the HTML
-    try {
-      const stored = localStorage.getItem(key);
-      if (stored !== null) openState = stored === '1';
-    } catch { /* ignore */ }
-    el.open = openState;
-    el.addEventListener('toggle', () => {
-      try { localStorage.setItem(key, el.open ? '1' : '0'); } catch { /* ignore */ }
+  function matchHeader(headers) {
+    var idx = {};
+    headers.forEach(function (h, i) {
+      var key = String(h || '').trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+      Object.keys(CSV_HEADER_ALIASES).forEach(function (field) {
+        if (idx[field] !== undefined) return;
+        if (CSV_HEADER_ALIASES[field].indexOf(key) !== -1) idx[field] = i;
+      });
     });
-  });
-}
-
-/* ============================================================
- * ADMIN MODE — client-side hash gate + session-local editing +
- * export-to-commit. No backend; edits are session-local until the
- * owner exports the file and commits it.
- * ========================================================== */
-// True only when the admin is unlocked AND not currently previewing as a
-// visitor. Layer-visibility and hidden-site gates should check THIS, never
-// state.adminMode directly, so "Preview as visitor" can simulate the public
-// view without actually logging out. The admin link/panel itself is NOT
-// gated by this — it must stay reachable so Euan can exit preview.
-function isEffectiveAdmin() { return state.adminMode && !state.previewAsVisitor; }
-
-function wireAdmin(map) {
-  const link = document.getElementById('admin-link');
-  link.onclick = () => toggleAdmin(map);
-  if (state.adminMode) renderAdminPanel(map);
-  refreshAdminLink();
-  const bannerExit = document.getElementById('preview-banner-exit');
-  if (bannerExit) bannerExit.onclick = () => togglePreviewAsVisitor(map);
-}
-function refreshAdminLink() {
-  const link = document.getElementById('admin-link');
-  link.lastChild.textContent = state.adminMode ? ' Admin mode (unlocked)' : ' Admin';
-}
-async function toggleAdmin(map) {
-  if (state.adminMode) { showAdminPanel(true); return; }
-  const pw = window.prompt('Admin password:');
-  if (pw == null) return;
-  const ok = (await sha256(pw)) === ADMIN_HASH;
-  if (!ok) { window.alert('Incorrect password.'); return; }
-  state.adminMode = true;
-  try { sessionStorage.setItem('sb-admin', '1'); } catch { /* ignore */ }
-  refreshAdminLink();
-  renderToggles(map);      // admin now sees every toggle
-  applySites(map);         // admin now sees hidden sites too
-  renderAdminPanel(map);
-}
-// Purely a rendering/visibility simulation: no sessionStorage change, no
-// actual logout, ADMIN_HASH/password flow untouched. Re-renders toggles and
-// sites so isEffectiveAdmin()'s new value takes effect immediately, then
-// refreshes the admin panel (button label) and the top-center banner.
-function togglePreviewAsVisitor(map) {
-  state.previewAsVisitor = !state.previewAsVisitor;
-  renderToggles(map);
-  applySites(map);
-  renderAdminPanel(map);
-  const banner = document.getElementById('preview-banner');
-  if (banner) banner.classList.toggle('hidden', !state.previewAsVisitor);
-}
-
-function lockAdmin(map) {
-  state.adminMode = false;
-  state.previewAsVisitor = false; // reset so the next unlock doesn't inherit a stale preview state
-  const banner = document.getElementById('preview-banner');
-  if (banner) banner.classList.add('hidden');
-  try { sessionStorage.removeItem('sb-admin'); } catch { /* ignore */ }
-  const panel = document.getElementById('admin-panel');
-  panel.classList.add('hidden'); panel.innerHTML = '';
-  refreshAdminLink();
-  renderToggles(map);
-  applySites(map);
-}
-function showAdminPanel(on) {
-  document.getElementById('admin-panel').classList.toggle('hidden', !on);
-}
-
-function renderAdminPanel(map) {
-  const panel = document.getElementById('admin-panel');
-  panel.classList.remove('hidden');
-  panel.innerHTML = `
-    <div class="section-title" style="margin-top:6px">Admin mode</div>
-    <div class="note">Edits apply to <b>this browser session only</b>. To publish them, Export the file(s) and commit to the repo.</div>
-    <div class="admin-actions">
-      <button id="admin-preview" class="btn">${state.previewAsVisitor ? 'Exit preview (back to admin)' : 'Preview as visitor'}</button>
-      <button id="admin-lock" class="btn">Lock</button>
-    </div>
-
-    <div class="section-title">Import dive sites</div>
-    <div class="import-form">
-      <div class="filepick">
-        <button id="site-import-pick" class="btn small" type="button">Choose file…</button>
-        <input type="file" id="site-import-file" accept=".csv,.geojson,.json" hidden />
-        <span class="fname" id="site-import-fname">CSV or GeoJSON — columns/keys: name, lat, lon, depth_min_m, depth_max_m, description</span>
-      </div>
-      <div class="row2">
-        <input type="text" id="site-import-collection" placeholder="Collection / folder (optional)">
-        <button id="site-import-go" class="btn" type="button" disabled>Import</button>
-      </div>
-      <div class="import-status" id="site-import-status"></div>
-    </div>
-
-    <div class="section-title">Add a site manually</div>
-    <div class="add-form">
-      <div class="row2"><input type="text" id="site-add-name" placeholder="Name*"><input type="text" id="site-add-collection" placeholder="Collection / folder"></div>
-      <div class="row2"><input type="text" id="site-add-lat" placeholder="Lat (decimal)*"><input type="text" id="site-add-lon" placeholder="Lon (decimal)*"></div>
-      <div class="row2"><input type="text" id="site-add-dmin" placeholder="Min depth (m)"><input type="text" id="site-add-dmax" placeholder="Max depth (m)"></div>
-      <input type="text" id="site-add-desc" placeholder="Description (optional)">
-      <button id="site-add-go" class="btn primary" type="button">Add site</button>
-      <div class="import-status" id="site-add-status"></div>
-    </div>
-
-    <div class="section-title">Dive sites — edit, organise &amp; show/hide</div>
-    <div id="admin-sites" class="admin-list"></div>
-    <div class="admin-actions">
-      <button id="export-sites" class="btn primary">Export all (dive_sites.geojson)</button>
-      <button id="export-sites-sel" class="btn">Export selected (<span id="sel-count">0</span>)</button>
-    </div>
-
-    <div class="section-title">Visitor layers — visible to everyone</div>
-    <div id="admin-layers" class="admin-list"></div>
-    <div class="admin-actions"><button id="export-config" class="btn primary">Export layer_config.json</button></div>`;
-
-  renderSiteManagerList(map);
-  wireSiteImport(map);
-  wireSiteAdd(map);
-
-  // ---- layer availability rows ----
-  const lbox = panel.querySelector('#admin-layers');
-  LAYER_DEFS.forEach((d) => {
-    const avail = state.layerConfig[d.key] !== false;
-    const row = document.createElement('div'); row.className = 'arow';
-    row.innerHTML = `<input type="checkbox" ${avail ? 'checked' : ''}><span>${d.label}</span>`;
-    row.querySelector('input').onchange = (e) => {
-      state.layerConfig[d.key] = e.target.checked;
-      renderToggles(map);   // reflect immediately (admin still sees all; preview affects nothing until export)
-    };
-    lbox.appendChild(row);
-  });
-
-  panel.querySelector('#admin-preview').onclick = () => togglePreviewAsVisitor(map);
-  panel.querySelector('#admin-lock').onclick = () => lockAdmin(map);
-  panel.querySelector('#export-sites').onclick = () => download('dive_sites.geojson', JSON.stringify(state.sites, null, 2));
-  panel.querySelector('#export-sites-sel').onclick = () => {
-    const feats = (state.sites.features || []).filter((f) => state.selectedSiteIds.has(f.properties.id));
-    if (!feats.length) { window.alert('No sites selected. Tick the checkbox next to each site you want to export.'); return; }
-    download('dive_sites_selected.geojson', JSON.stringify(fc(feats), null, 2));
-  };
-  panel.querySelector('#export-config').onclick = () => {
-    const cfg = {}; LAYER_DEFS.forEach((d) => { cfg[d.key] = state.layerConfig[d.key] !== false; });
-    download('layer_config.json', JSON.stringify(cfg, null, 2));
-  };
-}
-
-/* ---- dive-site manager: grouped, editable, selectable list ---- */
-function siteCollection(f) { return (f.properties.collection && String(f.properties.collection).trim()) || 'Uncategorized'; }
-
-function renderSiteManagerList(map) {
-  const panel = document.getElementById('admin-panel');
-  const sbox = panel.querySelector('#admin-sites');
-  const selCount = panel.querySelector('#sel-count');
-  sbox.innerHTML = '';
-  const feats = state.sites.features || [];
-  selCount.textContent = String(state.selectedSiteIds.size);
-
-  const groups = new Map();
-  feats.forEach((f) => {
-    const k = siteCollection(f);
-    if (!groups.has(k)) groups.set(k, []);
-    groups.get(k).push(f);
-  });
-  const order = [...groups.keys()].sort((a, b) => (a === 'Uncategorized' ? 1 : b === 'Uncategorized' ? -1 : a.localeCompare(b)));
-
-  order.forEach((coll) => {
-    const head = document.createElement('div'); head.className = 'collgroup';
-    head.textContent = `${coll} (${groups.get(coll).length})`;
-    sbox.appendChild(head);
-    groups.get(coll).forEach((f) => sbox.appendChild(buildSiteRow(map, f)));
-  });
-}
-
-function buildSiteRow(map, f) {
-  const p = f.properties;
-  const id = p.id;
-  const row = document.createElement('div'); row.className = 'arow site-row';
-  row.innerHTML = `
-    <input type="checkbox" class="sel-cb" title="Select for export" ${state.selectedSiteIds.has(id) ? 'checked' : ''}>
-    <input type="checkbox" class="vis-cb" title="Show to visitors" ${p.hidden === true ? '' : 'checked'}>
-    <input type="text" class="nm-tx" value="${esc(p.name)}">
-    <button class="btn small expandbtn" type="button">${state.expandedSiteId === id ? 'Close' : 'Edit'}</button>`;
-  const selCb = row.querySelector('.sel-cb');
-  const visCb = row.querySelector('.vis-cb');
-  const nmTx = row.querySelector('.nm-tx');
-  const expandBtn = row.querySelector('.expandbtn');
-
-  selCb.onchange = () => {
-    if (selCb.checked) state.selectedSiteIds.add(id); else state.selectedSiteIds.delete(id);
-    const selCount = document.getElementById('sel-count');
-    if (selCount) selCount.textContent = String(state.selectedSiteIds.size);
-  };
-  visCb.onchange = () => { f.properties.hidden = !visCb.checked; applySites(map); };
-  nmTx.onchange = () => { f.properties.name = nmTx.value.trim() || f.properties.name; applySites(map); };
-  expandBtn.onclick = () => {
-    state.expandedSiteId = (state.expandedSiteId === id) ? null : id;
-    renderSiteManagerList(map);
-  };
-
-  if (state.expandedSiteId === id) {
-    const [lon, lat] = f.geometry.coordinates;
-    const edit = document.createElement('div'); edit.className = 'site-edit';
-    edit.innerHTML = `
-      <div><label>Latitude</label><input type="text" class="e-lat" value="${lat}"></div>
-      <div><label>Longitude</label><input type="text" class="e-lon" value="${lon}"></div>
-      <div><label>Min depth (m)</label><input type="text" class="e-dmin" value="${p.depth_min_m ?? ''}"></div>
-      <div><label>Max depth (m)</label><input type="text" class="e-dmax" value="${p.depth_max_m ?? ''}"></div>
-      <div class="full"><label>Collection / folder</label><input type="text" class="e-coll" value="${esc(siteCollection(f) === 'Uncategorized' ? '' : siteCollection(f))}" placeholder="Uncategorized"></div>
-      <div class="full"><label>Description</label><textarea class="e-desc">${esc(p.description || '')}</textarea></div>
-      <div class="full admin-actions" style="margin:2px 0 0">
-        <button class="btn small e-save" type="button">Save</button>
-        <button class="btn small danger e-delete" type="button">Delete site</button>
-      </div>`;
-    const g = (cls) => edit.querySelector(cls);
-    g('.e-save').onclick = () => {
-      const newLat = parseFloat(g('.e-lat').value), newLon = parseFloat(g('.e-lon').value);
-      if (Number.isFinite(newLat) && Number.isFinite(newLon)) f.geometry.coordinates = [newLon, newLat];
-      const dmin = g('.e-dmin').value.trim(), dmax = g('.e-dmax').value.trim();
-      f.properties.depth_min_m = dmin === '' ? undefined : parseFloat(dmin);
-      f.properties.depth_max_m = dmax === '' ? undefined : parseFloat(dmax);
-      f.properties.description = g('.e-desc').value.trim() || undefined;
-      f.properties.collection = g('.e-coll').value.trim() || undefined;
-      applySites(map);
-      renderSiteManagerList(map);
-    };
-    g('.e-delete').onclick = () => {
-      if (!window.confirm(`Delete "${p.name}"? This only affects your current browser session until you export.`)) return;
-      state.sites.features = state.sites.features.filter((x) => x !== f);
-      state.selectedSiteIds.delete(id);
-      state.expandedSiteId = null;
-      applySites(map);
-      renderSiteManagerList(map);
-    };
-    row.appendChild(edit);
+    return idx;
   }
-  return row;
-}
+  function parseCSVImport(text, withCollection) {
+    var rows = parseCSVRows(text).filter(function (r) { return r.length && !(r.length === 1 && r[0].trim() === ''); });
+    if (!rows.length) return { sites: [], skipped: 0, total: 0, error: 'Empty file.' };
+    var idx = matchHeader(rows[0]);
+    if (idx.lat === undefined || idx.lon === undefined) {
+      return { sites: [], skipped: 0, total: rows.length - 1, error: 'Could not find latitude/longitude columns in the header row.' };
+    }
+    var sites = [], skipped = 0;
+    for (var r = 1; r < rows.length; r++) {
+      var row = rows[r];
+      var name = idx.name !== undefined ? (row[idx.name] || '').trim() : '';
+      var ll = parseLatLon(row[idx.lat], row[idx.lon]);
+      if (!ll) { skipped++; continue; }
+      var dminR = parseDepth(idx.depth_min_m !== undefined ? row[idx.depth_min_m] : '');
+      var dmaxR = parseDepth(idx.depth_max_m !== undefined ? row[idx.depth_max_m] : '');
+      var desc = idx.description !== undefined ? (row[idx.description] || '').trim() : '';
+      var site = {
+        id: uid(), name: name || ('Site ' + (sites.length + 1)),
+        lat: ll.lat, lon: ll.lon,
+        depth_min_m: dminR.ok ? dminR.value : null,
+        depth_max_m: dmaxR.ok ? dmaxR.value : null,
+        description: desc
+      };
+      if (withCollection && idx.collection !== undefined) site.collection = (row[idx.collection] || '').trim();
+      sites.push(site);
+    }
+    return { sites: sites, skipped: skipped, total: rows.length - 1 };
+  }
+  function parseGeoJSONImport(text, withCollection) {
+    var data = JSON.parse(text);
+    var feats;
+    if (data && data.type === 'FeatureCollection' && Array.isArray(data.features)) feats = data.features;
+    else if (data && data.type === 'Feature') feats = [data];
+    else return { sites: [], skipped: 0, total: 0, error: 'Not a GeoJSON Feature or FeatureCollection.' };
+    var sites = [], skipped = 0;
+    feats.forEach(function (f) {
+      if (!f || !f.geometry || f.geometry.type !== 'Point' || !Array.isArray(f.geometry.coordinates)) { skipped++; return; }
+      var lon = f.geometry.coordinates[0], lat = f.geometry.coordinates[1];
+      var ll = parseLatLon(lat, lon);
+      if (!ll) { skipped++; return; }
+      var p = f.properties || {};
+      var dminR = parseDepth(p.depth_min_m), dmaxR = parseDepth(p.depth_max_m);
+      var site = {
+        id: uid(), name: p.name ? String(p.name) : ('Site ' + (sites.length + 1)),
+        lat: ll.lat, lon: ll.lon,
+        depth_min_m: dminR.ok ? dminR.value : null,
+        depth_max_m: dmaxR.ok ? dmaxR.value : null,
+        description: p.description ? String(p.description) : ''
+      };
+      if (withCollection && p.collection) site.collection = String(p.collection);
+      sites.push(site);
+    });
+    return { sites: sites, skipped: skipped, total: feats.length };
+  }
+  function finishImport(filename, result) {
+    var report = byId('ms-import-report');
+    if (!result.sites.length) {
+      report.hidden = false;
+      report.className = 'ms-import-report ms-error';
+      report.textContent = result.error || ('No usable rows found (skipped ' + result.skipped + ' of ' + result.total + ').');
+      return;
+    }
+    var baseName = filename.replace(/\.[^.]+$/, '').trim() || 'Imported';
+    var col = { id: uid(), name: uniqueCollectionName(baseName), sites: result.sites };
+    userData.collections.push(col);
+    userData.activeCollectionId = col.id;
+    saveUserData();
+    refreshUserSitesSource();
+    renderCollections();
+    renderSiteList();
+    updateAddSectionState();
+    report.hidden = false;
+    report.className = 'ms-import-report';
+    var msg = 'Imported ' + result.sites.length + ' site(s) into "' + col.name + '".';
+    if (result.skipped) msg += ' Skipped ' + result.skipped + ' row(s) with unusable coordinates.';
+    report.textContent = msg;
+  }
 
-/* ---- import (CSV / GeoJSON) ---- */
-function wireSiteImport(map) {
-  const pick = document.getElementById('site-import-pick');
-  const file = document.getElementById('site-import-file');
-  const fname = document.getElementById('site-import-fname');
-  const go = document.getElementById('site-import-go');
-  const status = document.getElementById('site-import-status');
-  let picked = null;
-  pick.onclick = () => file.click();
-  file.onchange = () => {
-    picked = file.files && file.files[0];
-    fname.textContent = picked ? picked.name : 'CSV or GeoJSON — columns/keys: name, lat, lon, depth_min_m, depth_max_m, description';
-    go.disabled = !picked;
-    status.textContent = ''; status.className = 'import-status';
-  };
-  go.onclick = async () => {
-    if (!picked) return;
-    const collection = document.getElementById('site-import-collection').value.trim() || undefined;
-    status.className = 'import-status'; status.textContent = 'Reading…';
-    try {
-      const text = await picked.text();
-      const isJson = /\.(geojson|json)$/i.test(picked.name) || text.trim().startsWith('{') || text.trim().startsWith('[');
-      const parsed = isJson ? parseSitesFromGeoJSON(text) : parseSitesFromCSV(text);
-      if (!parsed.features.length) {
-        status.className = 'import-status err';
-        status.textContent = parsed.errors.length ? `No sites imported: ${parsed.errors[0]}` : 'No sites found in file.';
+  /* ---- export ---- */
+  function selectedSiteIds(containerId) {
+    var boxes = document.querySelectorAll('#' + containerId + ' .ms-site-check:checked');
+    var ids = [];
+    boxes.forEach(function (b) { ids.push(b.getAttribute('data-id')); });
+    return ids;
+  }
+  function exportGeoJSON() {
+    var ids = selectedSiteIds('ms-sites');
+    var items = currentListSites().filter(function (s) { return ids.indexOf(s.id) !== -1; });
+    if (!items.length) { window.alert('Select at least one site to export.'); return; }
+    var out = fc(items.map(function (s) {
+      return { type: 'Feature', geometry: { type: 'Point', coordinates: [s.lon, s.lat] }, properties: s.props };
+    }));
+    downloadBlob('dive-sites-export.geojson', 'application/geo+json', JSON.stringify(out, null, 2));
+  }
+  function csvEscape(v) {
+    var s = (v === null || v === undefined) ? '' : String(v);
+    if (/[",\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+  function exportCSV() {
+    var ids = selectedSiteIds('ms-sites');
+    var items = currentListSites().filter(function (s) { return ids.indexOf(s.id) !== -1; });
+    if (!items.length) { window.alert('Select at least one site to export.'); return; }
+    var lines = ['name,lat,lon,depth_min_m,depth_max_m,description'];
+    items.forEach(function (s) {
+      lines.push([csvEscape(s.props.name), s.lat, s.lon, csvEscape(s.props.depth_min_m), csvEscape(s.props.depth_max_m), csvEscape(s.props.description)].join(','));
+    });
+    downloadBlob('dive-sites-export.csv', 'text/csv', lines.join('\r\n'));
+  }
+
+  function initMySitesUI() {
+    renderCollections();
+    renderSiteList();
+    updateAddSectionState();
+
+    byId('ms-collections').addEventListener('click', function (e) {
+      var renameBtn = e.target.closest('.ms-col-rename');
+      var delBtn = e.target.closest('.ms-col-del');
+      if (renameBtn) {
+        var col = findCollection(renameBtn.getAttribute('data-id'));
+        if (!col) return;
+        var name = window.prompt('Rename collection', col.name);
+        if (name === null) return;
+        name = name.trim();
+        if (!name) return;
+        col.name = name;
+        saveUserData();
+        renderCollections();
+        renderSiteList();
         return;
       }
-      parsed.features.forEach((f) => {
-        f.properties.id = genId();
-        f.properties.verified = false;
-        if (collection) f.properties.collection = collection;
+      if (delBtn) {
+        var col2 = findCollection(delBtn.getAttribute('data-id'));
+        if (!col2) return;
+        var ok = window.confirm('Delete collection "' + col2.name + '" and its ' + col2.sites.length + ' site(s)? This cannot be undone.');
+        if (!ok) return;
+        userData.collections = userData.collections.filter(function (c) { return c.id !== col2.id; });
+        if (userData.activeCollectionId === col2.id) userData.activeCollectionId = null;
+        saveUserData();
+        refreshUserSitesSource();
+        renderCollections();
+        renderSiteList();
+        updateAddSectionState();
+        return;
+      }
+      var row = e.target.closest('.ms-col');
+      if (row) {
+        userData.activeCollectionId = row.getAttribute('data-id');
+        saveUserData();
+        renderCollections();
+        renderSiteList();
+        updateAddSectionState();
+      }
+    });
+
+    byId('ms-newcol-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var input = byId('ms-newcol-name');
+      var name = input.value.trim();
+      if (!name) { input.focus(); return; }
+      var col = { id: uid(), name: uniqueCollectionName(name), sites: [] };
+      userData.collections.push(col);
+      userData.activeCollectionId = col.id;
+      saveUserData();
+      input.value = '';
+      renderCollections();
+      renderSiteList();
+      updateAddSectionState();
+    });
+
+    byId('ms-add-form').addEventListener('submit', handleAddSubmit);
+    byId('ms-add-cancel').addEventListener('click', function () { resetAddForm(); renderSiteList(); });
+
+    byId('ms-sites').addEventListener('click', function (e) {
+      var delBtn = e.target.closest('.ms-site-del');
+      if (delBtn) {
+        var col = addTargetCollection();
+        if (!col) return;
+        var id = delBtn.getAttribute('data-id');
+        var site = findSiteInCollection(col, id);
+        if (!site) return;
+        var ok = window.confirm('Delete site "' + site.name + '"?');
+        if (!ok) return;
+        col.sites = col.sites.filter(function (s) { return s.id !== id; });
+        if (msEditingId === id) { msEditingId = null; resetAddForm(); }
+        saveUserData();
+        refreshUserSitesSource();
+        renderCollections();
+        renderSiteList();
+        return;
+      }
+      var infoEl = e.target.closest('.ms-site-info');
+      if (infoEl) {
+        var row = infoEl.closest('.ms-site');
+        if (!row || !row.classList.contains('editable')) return;
+        var col2 = addTargetCollection();
+        if (!col2) return;
+        var site2 = findSiteInCollection(col2, row.getAttribute('data-id'));
+        if (!site2) return;
+        beginEditSite(site2);
+      }
+    });
+
+    byId('ms-file').addEventListener('change', function (e) {
+      var file = e.target.files && e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function () {
+        var text = String(reader.result || '');
+        var lower = file.name.toLowerCase();
+        var result;
+        try {
+          result = (lower.slice(-8) === '.geojson' || lower.slice(-5) === '.json')
+            ? parseGeoJSONImport(text, false)
+            : parseCSVImport(text, false);
+        } catch (err) {
+          result = { sites: [], skipped: 0, total: 0, error: 'Could not parse file: ' + err.message };
+        }
+        finishImport(file.name, result);
+        e.target.value = '';
+      };
+      reader.onerror = function () {
+        finishImport(file.name, { sites: [], skipped: 0, total: 0, error: 'Could not read file.' });
+        e.target.value = '';
+      };
+      reader.readAsText(file);
+    });
+
+    byId('ms-select-all').addEventListener('click', function () {
+      var boxes = document.querySelectorAll('#ms-sites .ms-site-check');
+      var allChecked = boxes.length > 0 && Array.prototype.every.call(boxes, function (b) { return b.checked; });
+      boxes.forEach(function (b) { b.checked = !allChecked; });
+    });
+    byId('ms-export-geojson').addEventListener('click', exportGeoJSON);
+    byId('ms-export-csv').addEventListener('click', exportCSV);
+  }
+  initMySitesUI();
+
+  /* ============================================================
+   * ADMIN — site-owner tools. Client-side password gate (sha256 hash only,
+   * no backend possible on a static site); edits are session-local until
+   * exported and committed. Distinct from "My dive sites" above, which is
+   * every visitor's own private localStorage collection.
+   * ========================================================== */
+  var adEditingId = null;
+  function wireAdmin() {
+    byId('admin-unlock').addEventListener('click', function () {
+      var pw = window.prompt('Admin password:');
+      if (pw == null) return;
+      sha256(pw).then(function (hash) {
+        if (hash !== ADMIN_HASH) { window.alert('Incorrect password.'); return; }
+        state.adminMode = true;
+        try { sessionStorage.setItem('sb-admin', '1'); } catch (e) {}
+        showAdminUnlocked();
+        renderVisitorGating();
+        applyOfficialSites();
       });
-      state.sites.features = (state.sites.features || []).concat(parsed.features);
-      applySites(map);
-      renderSiteManagerList(map);
-      const skipped = parsed.errors.length ? ` (${parsed.errors.length} row(s) skipped: ${parsed.errors.slice(0, 3).join('; ')}${parsed.errors.length > 3 ? '…' : ''})` : '';
-      status.className = 'import-status';
-      status.textContent = `Imported ${parsed.features.length} site(s)${skipped}.`;
-      file.value = ''; picked = null; go.disabled = true;
-      fname.textContent = 'CSV or GeoJSON — columns/keys: name, lat, lon, depth_min_m, depth_max_m, description';
-    } catch (err) {
-      status.className = 'import-status err';
-      status.textContent = `Import failed: ${err.message || err}`;
+    });
+    byId('admin-lock').addEventListener('click', function () {
+      state.adminMode = false;
+      state.previewAsVisitor = false;
+      try { sessionStorage.removeItem('sb-admin'); } catch (e) {}
+      byId('previewbar').classList.add('hidden');
+      showAdminLocked();
+      renderVisitorGating();
+      applyOfficialSites();
+    });
+    byId('admin-preview').addEventListener('click', togglePreviewAsVisitor);
+    byId('previewbar-exit').addEventListener('click', togglePreviewAsVisitor);
+
+    byId('ad-add-form').addEventListener('submit', handleAdAddSubmit);
+    byId('ad-add-cancel').addEventListener('click', function () { resetAdAddForm(); renderAdminSiteList(); });
+    byId('ad-file').addEventListener('change', handleAdImport);
+    byId('ad-select-all').addEventListener('click', function () {
+      var boxes = document.querySelectorAll('#ad-sites .ms-site-check');
+      var allChecked = boxes.length > 0 && Array.prototype.every.call(boxes, function (b) { return b.checked; });
+      boxes.forEach(function (b) { b.checked = !allChecked; });
+    });
+    byId('ad-export-all').addEventListener('click', function () {
+      downloadBlob('dive_sites.geojson', 'application/geo+json', JSON.stringify(officialFC, null, 2));
+    });
+    byId('ad-export-sel').addEventListener('click', function () {
+      var ids = selectedSiteIds('ad-sites');
+      var feats = (officialFC.features || []).filter(function (f, i) { return ids.indexOf('off-' + i) !== -1; });
+      if (!feats.length) { window.alert('Select at least one site to export.'); return; }
+      downloadBlob('dive_sites_selected.geojson', 'application/geo+json', JSON.stringify(fc(feats), null, 2));
+    });
+    byId('ad-export-config').addEventListener('click', function () {
+      downloadBlob('layer_config.json', 'application/json', JSON.stringify(state.layerConfig, null, 2));
+    });
+    byId('ad-sites').addEventListener('click', handleAdSiteListClick);
+
+    if (state.adminMode) showAdminUnlocked(); else showAdminLocked();
+    renderAdminLayerConfig();
+  }
+  function showAdminLocked() { byId('admin-locked').hidden = false; byId('admin-unlocked').hidden = true; }
+  function showAdminUnlocked() {
+    byId('admin-locked').hidden = true; byId('admin-unlocked').hidden = false;
+    byId('admin-preview').textContent = state.previewAsVisitor ? 'Exit preview (back to admin)' : 'Preview as visitor';
+    renderAdminSiteList();
+    renderAdminLayerConfig();
+  }
+  function togglePreviewAsVisitor() {
+    state.previewAsVisitor = !state.previewAsVisitor;
+    byId('previewbar').classList.toggle('hidden', !state.previewAsVisitor);
+    byId('admin-preview').textContent = state.previewAsVisitor ? 'Exit preview (back to admin)' : 'Preview as visitor';
+    renderVisitorGating();
+    applyOfficialSites();
+  }
+  function renderAdminLayerConfig() {
+    var box = byId('ad-layers');
+    if (!box || !state.adminMode) return;
+    var LABELS = { relief: 'Colour relief', contours: 'Depth contours', sites: 'Dive sites',
+      'user-sites': 'My dive sites', entries: 'Dive entry points', prospects: 'Prospect leads',
+      lidar: 'Lidar tracks', geology: 'Seafloor geology (CGS)', '3d': '3D terrain' };
+    var html = '';
+    Object.keys(LABELS).forEach(function (key) {
+      var avail = state.layerConfig[key] !== false;
+      html += '<label class="row toggle"><span class="row-label">' + LABELS[key] + '</span>' +
+        '<input type="checkbox" class="ad-layer-cb" data-key="' + key + '" ' + (avail ? 'checked' : '') + ' />' +
+        '<span class="switch" aria-hidden="true"></span></label>';
+    });
+    box.innerHTML = html;
+    box.querySelectorAll('.ad-layer-cb').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        state.layerConfig[cb.getAttribute('data-key')] = cb.checked;
+        renderVisitorGating();
+      });
+    });
+  }
+  function renderAdminSiteList() {
+    var container = byId('ad-sites');
+    if (!container || !state.adminMode) return;
+    var feats = officialFC && officialFC.features || [];
+    if (!feats.length) { container.innerHTML = '<p class="ms-empty">No official sites yet.</p>'; return; }
+    var html = '';
+    feats.forEach(function (f, i) {
+      var p = f.properties, id = 'off-' + i;
+      var bits = [];
+      if (isFinite(p.depth_min_m)) bits.push(p.depth_min_m);
+      if (isFinite(p.depth_max_m) && p.depth_max_m !== p.depth_min_m) bits.push(p.depth_max_m);
+      var depthStr = bits.length ? bits.map(function (v) { return v + ' m'; }).join(' to ') : MINUS;
+      html += '<div class="ms-site editable' + (adEditingId === id ? ' editing' : '') + (p.hidden === true ? ' ad-hidden' : '') + '" data-id="' + id + '">' +
+        '<input type="checkbox" class="ms-site-check" data-id="' + id + '" aria-label="Select ' + esc(p.name) + ' for export" />' +
+        '<span class="ms-site-info" tabindex="0" role="button">' +
+        '<span class="ms-site-name">' + esc(p.name) + (p.hidden === true ? ' (hidden)' : '') + (p.verified === false ? ' <i>(unverified)</i>' : '') + '</span>' +
+        '<span class="ms-site-depth">' + esc(depthStr) + (p.collection ? ' &middot; ' + esc(p.collection) : '') + '</span></span>' +
+        '<button type="button" class="ms-site-del" data-id="' + id + '" aria-label="Delete ' + esc(p.name) + '">&times;</button>' +
+        '</div>';
+    });
+    container.innerHTML = html;
+  }
+  function officialFeatureByRowId(id) {
+    var i = parseInt(id.replace('off-', ''), 10);
+    return (officialFC.features || [])[i] || null;
+  }
+  function resetAdAddForm() {
+    adEditingId = null;
+    byId('ad-add-form').reset();
+    byId('ad-add-submit').textContent = 'Add site';
+    byId('ad-add-cancel').hidden = true;
+    showAdAddError('');
+  }
+  function showAdAddError(msg) {
+    var el = byId('ad-add-error');
+    if (!msg) { el.hidden = true; el.textContent = ''; return; }
+    el.textContent = msg; el.hidden = false;
+  }
+  function handleAdAddSubmit(e) {
+    e.preventDefault();
+    showAdAddError('');
+    var name = byId('ad-f-name').value.trim();
+    if (!name) { showAdAddError('Name is required.'); return; }
+    var ll = parseLatLon(byId('ad-f-lat').value, byId('ad-f-lon').value);
+    if (!ll) { showAdAddError('Latitude/longitude missing, non-numeric, or outside the Sodwana Bay area.'); return; }
+    var dminR = parseDepth(byId('ad-f-dmin').value.trim());
+    if (!dminR.ok) { showAdAddError('Depth min looks invalid.'); return; }
+    var dmaxR = parseDepth(byId('ad-f-dmax').value.trim());
+    if (!dmaxR.ok) { showAdAddError('Depth max looks invalid.'); return; }
+    var coll = byId('ad-f-coll').value.trim();
+    var desc = byId('ad-f-desc').value.trim();
+
+    if (adEditingId) {
+      var f = officialFeatureByRowId(adEditingId);
+      if (!f) { showAdAddError('Could not find site to edit.'); return; }
+      f.properties.name = name;
+      f.geometry.coordinates = [ll.lon, ll.lat];
+      f.properties.depth_min_m = dminR.value; f.properties.depth_max_m = dmaxR.value;
+      f.properties.collection = coll || undefined;
+      f.properties.description = desc || undefined;
+    } else {
+      officialFC.features.push({
+        type: 'Feature',
+        properties: { name: name, depth_min_m: dminR.value, depth_max_m: dmaxR.value, collection: coll || undefined, description: desc || undefined, verified: false },
+        geometry: { type: 'Point', coordinates: [ll.lon, ll.lat] }
+      });
     }
-  };
-}
-
-// Flexible column-name matching: accepts common aliases so an export from any dive-log app
-// or a hand-built spreadsheet is likely to "just work" without a required exact header.
-const COL_ALIASES = {
-  name: ['name', 'site', 'site_name', 'sitename', 'title'],
-  lat: ['lat', 'latitude', 'y'],
-  lon: ['lon', 'lng', 'long', 'longitude', 'x'],
-  depth_min_m: ['depth_min_m', 'min_depth', 'mindepth', 'depth_min', 'min_depth_m'],
-  depth_max_m: ['depth_max_m', 'max_depth', 'maxdepth', 'depth_max', 'max_depth_m', 'depth', 'depth_m'],
-  description: ['description', 'desc', 'notes', 'note', 'comment'],
-  collection: ['collection', 'folder', 'group', 'category'],
-};
-function matchCol(headerLower, field) {
-  const idx = headerLower.findIndex((h) => COL_ALIASES[field].includes(h));
-  return idx;
-}
-function parseCsvLine(line) {
-  const out = []; let cur = ''; let inQ = false;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (inQ) {
-      if (c === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else inQ = false; }
-      else cur += c;
-    } else if (c === '"') inQ = true;
-    else if (c === ',') { out.push(cur); cur = ''; }
-    else cur += c;
+    resetAdAddForm();
+    applyOfficialSites();
   }
-  out.push(cur);
-  return out;
-}
-function parseSitesFromCSV(text) {
-  const lines = text.split(/\r\n|\n|\r/).filter((l) => l.trim() !== '');
-  const errors = [];
-  if (!lines.length) return { features: [], errors: ['file is empty'] };
-  const header = parseCsvLine(lines[0]).map((h) => h.trim().toLowerCase());
-  const ci = {
-    name: matchCol(header, 'name'), lat: matchCol(header, 'lat'), lon: matchCol(header, 'lon'),
-    depth_min_m: matchCol(header, 'depth_min_m'), depth_max_m: matchCol(header, 'depth_max_m'),
-    description: matchCol(header, 'description'), collection: matchCol(header, 'collection'),
-  };
-  if (ci.lat < 0 || ci.lon < 0) return { features: [], errors: ['could not find latitude/longitude columns'] };
-  const features = [];
-  for (let i = 1; i < lines.length; i++) {
-    const cols = parseCsvLine(lines[i]);
-    const lat = parseFloat(cols[ci.lat]), lon = parseFloat(cols[ci.lon]);
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) { errors.push(`row ${i + 1}: bad coordinates`); continue; }
-    const props = { name: (ci.name >= 0 && cols[ci.name] && cols[ci.name].trim()) || `Imported site ${features.length + 1}` };
-    if (ci.depth_min_m >= 0 && cols[ci.depth_min_m] !== undefined && cols[ci.depth_min_m] !== '') props.depth_min_m = parseFloat(cols[ci.depth_min_m]);
-    if (ci.depth_max_m >= 0 && cols[ci.depth_max_m] !== undefined && cols[ci.depth_max_m] !== '') props.depth_max_m = parseFloat(cols[ci.depth_max_m]);
-    if (ci.description >= 0 && cols[ci.description]) props.description = cols[ci.description].trim();
-    if (ci.collection >= 0 && cols[ci.collection]) props.collection = cols[ci.collection].trim();
-    features.push({ type: 'Feature', properties: props, geometry: { type: 'Point', coordinates: [lon, lat] } });
+  function handleAdImport(e) {
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function () {
+      var text = String(reader.result || '');
+      var lower = file.name.toLowerCase();
+      var result;
+      try {
+        result = (lower.slice(-8) === '.geojson' || lower.slice(-5) === '.json')
+          ? parseGeoJSONImport(text, true)
+          : parseCSVImport(text, true);
+      } catch (err) {
+        result = { sites: [], skipped: 0, total: 0, error: 'Could not parse file: ' + err.message };
+      }
+      var report = byId('ad-import-report');
+      if (!result.sites.length) {
+        report.hidden = false; report.className = 'ms-import-report ms-error';
+        report.textContent = result.error || ('No usable rows found (skipped ' + result.skipped + ' of ' + result.total + ').');
+        e.target.value = ''; return;
+      }
+      result.sites.forEach(function (s) {
+        officialFC.features.push({
+          type: 'Feature',
+          properties: { name: s.name, depth_min_m: s.depth_min_m, depth_max_m: s.depth_max_m, description: s.description || undefined, collection: s.collection || undefined, verified: false },
+          geometry: { type: 'Point', coordinates: [s.lon, s.lat] }
+        });
+      });
+      applyOfficialSites();
+      report.hidden = false; report.className = 'ms-import-report';
+      var msg = 'Imported ' + result.sites.length + ' site(s) into the official dataset.';
+      if (result.skipped) msg += ' Skipped ' + result.skipped + ' row(s) with unusable coordinates.';
+      report.textContent = msg;
+      e.target.value = '';
+    };
+    reader.onerror = function () { e.target.value = ''; };
+    reader.readAsText(file);
   }
-  return { features, errors };
-}
-function parseSitesFromGeoJSON(text) {
-  let data;
-  try { data = JSON.parse(text); } catch (e) { return { features: [], errors: [`invalid JSON: ${e.message}`] }; }
-  const errors = [];
-  let rawFeatures;
-  if (data && data.type === 'FeatureCollection') rawFeatures = data.features || [];
-  else if (data && data.type === 'Feature') rawFeatures = [data];
-  else if (Array.isArray(data)) {
-    // tolerant: an array of plain {name, lat, lon, ...} objects, not real GeoJSON
-    rawFeatures = data.map((r) => {
-      const lat = r.lat ?? r.latitude ?? r.y, lon = r.lon ?? r.lng ?? r.longitude ?? r.x;
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-      return { type: 'Feature', properties: { ...r }, geometry: { type: 'Point', coordinates: [lon, lat] } };
-    }).filter(Boolean);
-  } else return { features: [], errors: ['unrecognised GeoJSON structure'] };
+  function handleAdSiteListClick(e) {
+    var delBtn = e.target.closest('.ms-site-del');
+    if (delBtn) {
+      var id = delBtn.getAttribute('data-id');
+      var f = officialFeatureByRowId(id);
+      if (!f) return;
+      var ok = window.confirm('Delete site "' + f.properties.name + '"? This only affects your session until exported.');
+      if (!ok) return;
+      officialFC.features = officialFC.features.filter(function (x) { return x !== f; });
+      if (adEditingId === id) resetAdAddForm();
+      applyOfficialSites();
+      return;
+    }
+    var infoEl = e.target.closest('.ms-site-info');
+    if (infoEl) {
+      var row = infoEl.closest('.ms-site');
+      if (!row) return;
+      var id2 = row.getAttribute('data-id');
+      var f2 = officialFeatureByRowId(id2);
+      if (!f2) return;
+      adEditingId = id2;
+      byId('ad-f-name').value = f2.properties.name || '';
+      byId('ad-f-lat').value = f2.geometry.coordinates[1];
+      byId('ad-f-lon').value = f2.geometry.coordinates[0];
+      byId('ad-f-dmin').value = f2.properties.depth_min_m == null ? '' : f2.properties.depth_min_m;
+      byId('ad-f-dmax').value = f2.properties.depth_max_m == null ? '' : f2.properties.depth_max_m;
+      byId('ad-f-coll').value = f2.properties.collection || '';
+      byId('ad-f-desc').value = f2.properties.description || '';
+      byId('ad-add-submit').textContent = 'Save changes';
+      byId('ad-add-cancel').hidden = false;
+      showAdAddError('');
+      renderAdminSiteList();
+    }
+  }
 
-  const features = [];
-  rawFeatures.forEach((f, i) => {
-    if (!f || f.geometry?.type !== 'Point' || !Array.isArray(f.geometry.coordinates)) { errors.push(`feature ${i + 1}: not a Point`); return; }
-    const [lon, lat] = f.geometry.coordinates;
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) { errors.push(`feature ${i + 1}: bad coordinates`); return; }
-    const props = { ...(f.properties || {}) };
-    if (!props.name) props.name = `Imported site ${features.length + 1}`;
-    features.push({ type: 'Feature', properties: props, geometry: { type: 'Point', coordinates: [lon, lat] } });
+  /* ============================================================
+   * MEASURE — click-to-measure distance tool (top icon button + HUD).
+   * ========================================================== */
+  function initMeasure() {
+    var pts = [];
+    var btn = byId('btn-measure'), hud = byId('measure-hud'), stats = byId('measure-hud-stats');
+    function reset() {
+      pts = [];
+      var src = map.getSource('measure_src');
+      if (src) src.setData(fc([]));
+      stats.textContent = 'Click the map to start measuring';
+    }
+    function setActive(on) {
+      window.__measuring = on;
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      btn.classList.toggle('active', on);
+      hud.hidden = !on;
+      map.getCanvas().style.cursor = on ? 'crosshair' : '';
+      if (on && window.__routing) { byId('btn-route').click(); }
+      if (!on) reset();
+    }
+    btn.addEventListener('click', function () { setActive(!window.__measuring); });
+    byId('measure-done').addEventListener('click', function () { setActive(false); });
+    map.on('click', function (e) {
+      if (!window.__measuring) return;
+      pts.push([e.lngLat.lng, e.lngLat.lat]);
+      var feats = pts.map(function (p) { return { type: 'Feature', geometry: { type: 'Point', coordinates: p }, properties: {} }; });
+      if (pts.length > 1) feats.push({ type: 'Feature', geometry: { type: 'LineString', coordinates: pts }, properties: {} });
+      map.getSource('measure_src').setData(fc(feats));
+      if (pts.length > 1) {
+        var R = window.SodwanaRoute;
+        var dd = R.totalKm(pts), b = R.bearingDeg(pts[pts.length - 2], pts[pts.length - 1]);
+        stats.textContent = Math.round(dd * 1000) + ' m total · last leg bearing ' + Math.round(b) + '°';
+      } else {
+        stats.textContent = '1 point · click again to measure';
+      }
+    });
+  }
+
+  /* ============================================================
+   * PLAN ROUTE — click a polyline of waypoints, sample depth along it, and
+   * produce a dive-planning summary + exportable report.
+   * ========================================================== */
+  var routeWp = [];
+  var routeNumMarkers = [];
+  function initRoute() {
+    var btn = byId('btn-route'), hud = byId('route-hud');
+    var lastRoute = null;
+    function clearRouteNumMarkers() { routeNumMarkers.forEach(function (m) { m.remove(); }); routeNumMarkers = []; }
+    function rebuildLayers() {
+      var feats = routeWp.map(function (p, i) { return { type: 'Feature', properties: { n: i + 1 }, geometry: { type: 'Point', coordinates: p } }; });
+      if (routeWp.length > 1) feats.push({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: routeWp } });
+      map.getSource('route_src').setData(fc(feats));
+      clearRouteNumMarkers();
+      routeWp.forEach(function (p, i) {
+        var el = document.createElement('div');
+        el.className = 'dlbl route-num';
+        el.textContent = String(i + 1);
+        routeNumMarkers.push(new maplibregl.Marker({ element: el, anchor: 'bottom', offset: [0, -6] }).setLngLat(p).addTo(map));
+      });
+    }
+    function updateHud() {
+      var R = window.SodwanaRoute;
+      byId('route-hud-stats').textContent = routeWp.length + (routeWp.length === 1 ? ' point' : ' points') + ' · ' + Math.round(R.totalKm(routeWp) * 1000) + ' m';
+      byId('route-confirm').disabled = routeWp.length < 2;
+    }
+    function reset() {
+      routeWp = [];
+      var src = map.getSource('route_src');
+      if (src) src.setData(fc([]));
+      clearRouteNumMarkers();
+      updateHud();
+    }
+    function setActive(on) {
+      window.__routing = on;
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      btn.classList.toggle('active', on);
+      hud.hidden = !on;
+      map.getCanvas().style.cursor = on ? 'crosshair' : '';
+      if (on) {
+        if (window.__measuring) byId('btn-measure').click();
+        reset();
+      } else { reset(); }
+    }
+    btn.addEventListener('click', function () { setActive(!window.__routing); });
+    map.on('click', function (e) {
+      if (!window.__routing) return;
+      routeWp.push([e.lngLat.lng, e.lngLat.lat]);
+      rebuildLayers();
+      updateHud();
+    });
+    byId('route-cancel').addEventListener('click', function () { setActive(false); });
+    byId('route-confirm').addEventListener('click', function () {
+      if (routeWp.length < 2) return;
+      var R = window.SodwanaRoute;
+      var wp = routeWp.slice();
+      var legsResult = R.routeLegs(wp);
+      var profile = R.sampleRouteProfile(map, wp);
+      lastRoute = { wp: wp, legsResult: legsResult, profile: profile };
+      byId('route-summary-body').innerHTML = buildRouteSummaryHTML(wp, legsResult, profile);
+      var ta = byId('route-export-text'); ta.hidden = true; ta.value = '';
+      byId('route-export-copy').hidden = true;
+      setActive(false);
+      openPanel(byId('route-summary'), true);
+    });
+    byId('route-summary-close').addEventListener('click', function () { closePanel(byId('route-summary')); });
+    byId('route-summary-export').addEventListener('click', function () {
+      if (!lastRoute) return;
+      var R = window.SodwanaRoute;
+      var ta = byId('route-export-text');
+      ta.value = R.formatRouteReport(lastRoute.wp, lastRoute.legsResult, lastRoute.profile);
+      ta.hidden = false;
+      byId('route-export-copy').hidden = false;
+    });
+    byId('route-export-copy').addEventListener('click', function () {
+      navigator.clipboard.writeText(byId('route-export-text').value);
+    });
+  }
+  function depthReadingHTML(reading) {
+    if (!reading || reading.depthM === null) return 'no data (land / outside coverage)';
+    var tag = reading.band ? ' <small style="color:var(--ink-dim)">' + esc(reading.band.label) + ' — ' + esc(reading.band.status) + '</small>' : '';
+    return reading.depthM.toFixed(1) + ' m' + tag;
+  }
+  function buildRouteSummaryHTML(wp, legsResult, profile) {
+    var R = window.SodwanaRoute;
+    var stats = profile && profile.stats;
+    var P = [];
+    P.push('<p><b>Entry point</b><br><code>' + wp[0][1].toFixed(6) + ', ' + wp[0][0].toFixed(6) + '</code></p>');
+    P.push('<p><b>Waypoints (' + wp.length + ')</b><br>' + wp.map(function (pt) { return pt[1].toFixed(6) + ', ' + pt[0].toFixed(6); }).join('<br>') + '</p>');
+    var crossed = (profile && profile.bandsCrossed) || [];
+    if (crossed.indexOf('optical-wall') !== -1 || crossed.indexOf('coarse') !== -1) {
+      P.push('<p class="warn">This route passes deeper than 15 m. Depths beyond 15 m are lower-confidence.</p>');
+    }
+    P.push('<div>' + R.routeProfileSVG(profile) + '</div>');
+    if (stats) {
+      P.push('<p><b>Depth summary</b><br>' +
+        'Entry: ' + depthReadingHTML(stats.entry) + '<br>' +
+        (stats.max && stats.max.depthM !== null
+          ? 'Deepest: ' + depthReadingHTML(stats.max) + ' <small style="color:var(--ink-dim)">(at ' + Math.round(stats.max.dM) + ' m along route)</small><br>'
+          : 'Deepest: no data<br>') +
+        'Average: ' + (stats.avg && stats.avg.depthM !== null ? stats.avg.depthM.toFixed(1) + ' m' : 'no data') + '<br>' +
+        'Exit: ' + depthReadingHTML(stats.exit) + '<br>' +
+        '<small style="color:var(--ink-dim)">' + stats.validCount + '/' + stats.sampleCount + ' samples had depth data</small></p>');
+    }
+    var legs = (legsResult && legsResult.legs) || [];
+    if (legs.length) {
+      P.push('<p><b>Legs</b><br>' + legs.map(function (leg) {
+        return 'Leg ' + leg.index + ': heading ' + String(Math.round(leg.bearingDeg)).padStart(3, '0') + '°, distance ' + Math.round(leg.distanceM) + ' m';
+      }).join('<br>') + '<br><b>Total: ' + Math.round(legsResult.totalM) + ' m (' + (legsResult.totalM / 1000).toFixed(2) + ' km)</b></p>');
+    }
+    return P.join('');
+  }
+
+  var THEME_KEY = 'sodwana-theme';
+  function applyTheme(t) {
+    document.documentElement.setAttribute('data-theme', t);
+    try { localStorage.setItem(THEME_KEY, t); } catch (e) {}
+  }
+  (function initTheme() {
+    var saved = null;
+    try { saved = localStorage.getItem(THEME_KEY); } catch (e) {}
+    if (!saved) saved = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+    applyTheme(saved);
+  })();
+  byId('btn-theme').addEventListener('click', function () {
+    var cur = document.documentElement.getAttribute('data-theme');
+    applyTheme(cur === 'dark' ? 'light' : 'dark');
   });
-  return { features, errors };
-}
-
-/* ---- manual add ---- */
-function wireSiteAdd(map) {
-  const go = document.getElementById('site-add-go');
-  const status = document.getElementById('site-add-status');
-  go.onclick = () => {
-    const name = document.getElementById('site-add-name').value.trim();
-    const lat = parseFloat(document.getElementById('site-add-lat').value);
-    const lon = parseFloat(document.getElementById('site-add-lon').value);
-    if (!name) { status.className = 'import-status err'; status.textContent = 'Name is required.'; return; }
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) { status.className = 'import-status err'; status.textContent = 'Valid latitude and longitude are required.'; return; }
-    const dminV = document.getElementById('site-add-dmin').value.trim();
-    const dmaxV = document.getElementById('site-add-dmax').value.trim();
-    const collection = document.getElementById('site-add-collection').value.trim() || undefined;
-    const description = document.getElementById('site-add-desc').value.trim() || undefined;
-    const props = { id: genId(), name, verified: false };
-    if (dminV !== '') props.depth_min_m = parseFloat(dminV);
-    if (dmaxV !== '') props.depth_max_m = parseFloat(dmaxV);
-    if (collection) props.collection = collection;
-    if (description) props.description = description;
-    state.sites.features = (state.sites.features || []).concat([{ type: 'Feature', properties: props, geometry: { type: 'Point', coordinates: [lon, lat] } }]);
-    applySites(map);
-    renderSiteManagerList(map);
-    status.className = 'import-status'; status.textContent = `Added "${name}".`;
-    ['site-add-name', 'site-add-collection', 'site-add-lat', 'site-add-lon', 'site-add-dmin', 'site-add-dmax', 'site-add-desc']
-      .forEach((id) => { document.getElementById(id).value = ''; });
-  };
-}
-
-function download(name, text) {
-  const blob = new Blob([text], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = name;
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-/* ---------- helpers ---------- */
-function updateHash(map) {
-  const c = map.getCenter();
-  history.replaceState(null, '', `#${map.getZoom().toFixed(2)}/${c.lat.toFixed(5)}/${c.lng.toFixed(5)}`);
-}
-function ddm(lat, lon) {
-  const f = (v, pos, neg) => {
-    const hemi = v >= 0 ? pos : neg, a = Math.abs(v), d = Math.floor(a), m = (a - d) * 60;
-    return `${d}°${m.toFixed(3)}'${hemi}`;
-  };
-  return `${f(lat, 'N', 'S')} ${f(lon, 'E', 'W')}`;
-}
-// haversineKm / bearingDeg / totalKm now live in route.js (imported at top) —
-// the measure tool and Plan Route share the same great-circle formulas there.
-function fc(features) { return { type: 'FeatureCollection', features }; }
-function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
-async function getJSON(url) { try { const r = await fetch(url); return r.ok ? await r.json() : null; } catch { return null; } }
-async function head(url) { try { const r = await fetch(url, { method: 'HEAD' }); return r.ok; } catch { return false; } }
+})();

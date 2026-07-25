@@ -1,13 +1,11 @@
 {
-  "3d": true,
   "relief": true,
-  "hill": true,
-  "contour": true,
+  "contours": true,
   "sites": true,
-  "tracks": true,
-  "prospects": true,
-  "geology": true,
-  "isobaths": true,
+  "user-sites": true,
   "entries": true,
-  "measure": true
+  "prospects": true,
+  "lidar": true,
+  "geology": true,
+  "3d": true
 }

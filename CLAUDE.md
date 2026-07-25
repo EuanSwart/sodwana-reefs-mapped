@@ -183,53 +183,51 @@ Interrupt him only for: his GPS points CSV, GEE auth (if used), GitHub repo/Page
   (Lake Sibaya) confirmed out of the ocean AOI entirely, dropped. Full writeup:
   `reports/paper_review_2026-07-09.md`. Extracted PDF text left in the session outputs dir (not
   the repo) at paper_extracts/{miller_1998,green_2009}.txt — not committed, scratch only.
-irmed-cause systematic bias still count as honest, or does it need a proper datum lookup
-  first). (3) OSM Overpass: still blocked from this sandbox even with corrected query syntax and a
-  mirror host — confirmed sandbox-network limitation, not a source problem; separately, the
-  overpass-turbo.eu query text handed to Euan in the prior session had a real bug (a typographic
-  minus sign `−` instead of ASCII `-` in the bbox, which is what threw his parse error) — corrected
-  and handed back, not yet run by him. Also fixed: `reports/eval_scratch/rmse_against_holdout.py`
-  had `HOLDOUT_PATH` hardcoded to a now-dead prior-session sandbox path
-  (`/sessions/zen-practical-volta/...`); now resolved relative to the script's own location so the
-  harness is portable across sessions/machines. Lesson: this sandbox's outbound network
-  reachability is NOT a fixed property — Copernicus was unreachable in one session and worked
-  fine in the next; don't permanently write off a source after one network failure, retry later.
-- [2026-07-10] Wired Copernicus `phy_wk` into `pipeline/05_fuse_dem.py` as a band-conditional
-  override (replace SDB with Copernicus only where SDB's own value falls in 15-25 m), per Euan's
-  request. Ran it for real (`05_fuse_dem.py` -> `validate.py`): **15-25 m gate RMSE went from
-  4.90 m to 5.06 m — a regression, not the hoped-for improvement.** Diagnosed by sampling the
-  fused DEM's `source` band at each holdout point: at the 35 points the override actually touched,
-  SDB was already accurate there (RMSE 1.13 m) and got replaced by Copernicus's own ~1.2 m-biased
-  value (RMSE 2.96 m at those same points) — Copernicus's *better aggregate* RMSE across its whole
-  footprint doesn't mean "better where SDB is wrong"; "SDB says 15-25 m" selects by depth, not by
-  SDB error, and this AOI's sparse Copernicus coverage happened to land on an already-good patch.
-  Disabled by default (`fusion.copernicus_phy_wk_enabled: false` in `config/params.yaml`), code
-  and full band-override machinery left in place and documented (not deleted) for a future
-  attempt with a smarter selection mask (e.g. local disagreement/uncertainty, not raw depth).
-  Confirmed `validate.py` reproduces the known baseline exactly (1.35 / 4.90) after disabling.
-  Lesson: a source with better standalone/aggregate accuracy than what it's replacing can still
-  make a fused result *worse* if the swap-in criterion doesn't correlate with where the
-  original source is actually failing — always re-run the full holdout validation after wiring
-  in a new tier, never assume from the source's own standalone number.
-- [session 2026-07-09T21:15Z] review pipeline output; append real discoveries here.
-- [session 2026-07-09T21:24Z] review pipeline output; append real discoveries here.
-- [2026-07-10] Six site UI requests implemented via `frontend-builder` (site/app.js, site/index.html
-  only): (1) **Admin "preview as visitor" mode** — the admin password gate (`ADMIN_HASH`, default
-  "sodwana") and per-layer `layerConfig`/hidden-site machinery already existed but were unused (no
-  layer was ever actually set hidden, and admin had no way to see what a visitor sees without a
-  separate incognito browser). Added `state.previewAsVisitor` + `isEffectiveAdmin()` helper (gates
-  `sitesForDisplay()` and `renderToggles()`), a "Preview as visitor" button in the admin panel, and
-  a top-center exit banner. Admin panel itself stays reachable while previewing (not gated) so you
-  can always exit. Which layers/sites to actually mark admin-only is still Euan's call via the
-  existing admin panel checkboxes + Export — nothing was hidden by default. (2) Contour zoom-13
-  ("intermediate") threshold changed `[5,25]`→`[2,10]` m (2 m minor / 10 m major); zoom 11 and 15
-  left alone. `config/params.yaml`'s `contour_interval_m` doc value synced 5→2 to match (it mirrors
-  app.js for documentation only — no pipeline script reads it; app.js's live `thresholds` object is
-  the actual runtime source of truth). (3) Depth legend made collapsible (chevron reused from the
-  sidebar `.sec` pattern, state persisted to `localStorage['legend-collapsed']`). (4) Scale bar
-  moved `bottom-right`→`bottom-left` (was visually colliding with the legend, both anchored
-  bottom-right) and restyled to the dark panel theme instead of MapLibre's default white/black bar.
-  (5) Cursor coordinate readout (`#readout`) moved from a full bottom-left panel to a slim,
+- [2026-07-12] FUSION1 built (`pipeline/11_build_fusion1.py` + `11b_tile_fusion1.py`; full writeup
+  `reports/fusion1_report.md`). Decoded Euan's Garmin Quickdraw `possible_contours/` (867 `.qdc`
+  tiles) with the keyless `interlark/qdc-converter` (PyPI) -> 1.31 M soundings, 1.13 M in-AOI, 0–328 m
+  (`data/raw/`-style export lives in the session outputs `qdc_out/qdc_aoi_points_4326.csv`; NOTE the
+  raw .qdc are NOT in the repo, they're in the sibling mount `possible_contours/`). Garmin datum
+  offset vs ATL24-train = +0.84 m (draft), subtracted. Fusion = per-cell INVERSE-VARIANCE of
+  {validated-old-fused ≤16 m, ATL24-train, Garmin, CGS, hull-nearest-interp, GMRT-deep-only};
+  ~6.7 m grid; outputs `dem/fusion1_{depth,uncertainty,source}_4326.tif` + `site/tiles_fusion1/`.
+  **Validation vs held-out ATL24: 0–15 m RMSE 1.51 (baseline 1.45, ≈ preserved by reusing the
+  validated DEM verbatim ≤16 m); 15–25 m RMSE 4.20 (baseline 4.14 — the SAME optical-wall/shelf-break
+  result, gate NOT met, reported honestly, NOT lowered).** The real win is completeness: extends the
+  map from a −26 m ceiling to a clean 0→−81 m reef+canyon surface.
+  KEY LESSONS (cost ~8 build iterations): (1) GMRT is USELESS as a shelf/canyon discriminator over
+  this AOI — altimetry-derived, it reads DEEPER on the shelf break (−340 m) than in the real canyon
+  (−165 m). (2) SDB/old-fused is finite EVERYWHERE incl. the canyon (saturates to ~−15..−22 m over
+  −150 m water), so "SDB nodata" cannot mark the canyon and an SDB *ceiling* clamp FLATTENS the
+  canyon — must use SDB's own *uncertainty*, not its value, and reuse the validated DEM only in its
+  confident shallow range. (3) Garmin over the dive reef carries a LARGE spatially-COHERENT field of
+  false-bottom returns (39 k-cell connected blobs centred on the reef, not the break) that geometry
+  (median/grey-closing/connected-component) alone cannot remove. The filter that worked is the
+  **CGS-isobath envelope**: reject Garmin grossly deeper than the CGS-implied depth — CGS says the
+  reef is 20–30 m so the −100 m false-bottoms drop out, while the real shelf-break canyon (CGS runs
+  deep there) survives. This is the Garmin×CGS combo Euan proposed, and the earlier finding that the
+  two agree ~0-bias/1.5 m-MAD at 20–30 m is what makes it trustworthy. (4) Did NOT keep tuning
+  thresholds to shave 0-15m from 1.55→1.50 — that would be tuning on the holdout (forbidden); instead
+  reused the validated DEM structurally. Site: added a **"Fusion1 model" toggle** (`site/style.json`
+  new `fusion1-dem` source + `fusion1-relief`/`fusion1-hill` layers w/ deep ramp; `site/app.js`
+  `refreshDemLayers()` swaps relief/hillshade/3D/contours between baseline & Fusion1, deep contour
+  DemSource added). MOUNT QUIRK reconfirmed: the host Write tool truncated `site/style.json` at ~2 KB
+  (well under the ~6 KB rule-of-thumb) — rewrote via bash heredoc; large `.py`/`.json`/`.yaml` that
+  are executed/parsed should ALWAYS be written via `cat <<'EOF'` + verified with py_compile/json.load.
+  Deps pulled this session (persist in `~/.local`): qdc-converter, rasterio, pyarrow, mercantile,
+  scipy, matplotlib — big wheels (pyarrow 50 MB, rasterio 35 MB) exceeded the 45 s bash cap; got them
+  via parallel resumable `curl -C -` into `~/.cache/wheels` then `pip install --no-index`. Also: bash
+  background procs (`nohup &`) DO NOT survive between tool calls (fresh PID namespace each call), but
+  `~/.local` installs and `~/.cache` downloads DO persist.
+- [2026-07-12] Fusion1 5 m HD reef inset: `pipeline/11c_build_fusion1_inset.py` + `11d_tile_fusion1_inset.py`
+  (copies of 11/11b with grid = lon 32.660–32.735 / lat −27.620–−27.400, RES 0.000045 ~5 m; captures 81 %
+  of Garmin, the 2–9-mile reef zone). Outputs `dem/fusion1_inset_*` + `site/tiles_fusion1_inset/` (706 tiles
+  z12–16). In-strip validation IDENTICAL to 6.7 m (0-15m 1.29 PASS / 15-25m 3.86) — finer grid = detail, not
+  accuracy (data-limited). Wired as auto HD overlay: style.json `fusion1hd-dem` source (bounds-limited,
+  minzoom 12) + `fusion1hd-relief/hill`; app.js `refreshDemLayers()` shows them when Fusion1 active so the
+  reef sharpens on zoom-in with no extra toggle. 3D mesh still uses the 6.7 m `fusion1-dem` (MapLibre setTerrain
+  is single-source); HD only refines the relief/hillshade paint. Compare render: `reports/fusion1_inset_compare.png`.
+ a full bottom-left panel to a slim,
   semi-transparent (opacity .72→1 on hover) bottom-center strip — JS logic in `wireCoordinates()`
   untouched, only position/style. (6) CGS isobath label text-color was reusing the SAME depth-ramp
   expression as the line color (`isobathStyle()`), so deep isobaths (-60 to -95 m) rendered in
@@ -267,3 +265,179 @@ irmed-cause systematic bias still count as honest, or does it need a proper datu
   but still fails → report the honest number, same as today; no improvement → discard + document).
 - [session 2026-07-09T21:45Z] review pipeline output; append real discoveries here.
 - [session 2026-07-09T22:18Z] review pipeline output; append real discoveries here.
+- [session 2026-07-09T22:20Z] review pipeline output; append real discoveries here.
+- [2026-07-10] Evaluated 10 ACEP Algoa cruises (2002-2006) + 20 SAEON catalogue entries Euan
+  supplied — full writeup `reports/data_sources_ACEP_SAEON_evaluation_2026-07-10.md`. Nothing
+  integrated. Key finds: (1) all 4 Sodwana-Bay Algoa cruises (107/119/127/134) predate every
+  digital catalogue by ~a decade; per ACEP's own policy their data is DVD-archive-only at SAIAB,
+  request-only. The real bathymetry behind that whole program was never an Algoa-cruise product —
+  it's the March 2002 Marine GeoSolutions Reson SeaBat 8111 survey (Ramsay & Miller 2008, Hydro
+  International), the SAME still-unpublished dataset already flagged in the 2026-07-09 Green(2009)
+  paper review (Green/Ramsay/CGS) — confirms that's the one real lead, actionable only via direct
+  email request, not a portal search. (2) 18/20 SAEON "ACEP Smart Zones MPA" site entries
+  (Tongaat Pinnacles, Lens Ledge, uMdloti*, Richards Bay, Zinkwazi, Blood Reef, etc.) are confirmed
+  130-4,700 km SOUTH of the AOI via each record's own geoLocation bbox (SAEON GraphQL/DataCite),
+  not assumption, plus separately "Embargoed"-licensed behind an external Wix page regardless.
+  (3) Two national-scale SAEON products DO cover the AOI bbox and are worth a decision from Euan:
+  the SA mainland 100 m bathymetric grid (Manikam et al. 2024) has a working keyless download
+  (~888 MB, `repository.saeon.ac.za/index.php/s/E7P3mx9YqTmFeAb`) — not pulled yet (size + same
+  CGS/UKZN authors as our existing 2005 survey, real chance of redundancy, needs Euan's go-ahead
+  before spending the download); the SA mainland submarine-canyons shapefile (also Manikam/Green/
+  Sink et al., directly relevant to our canyon-corroboration work) has a bbox covering the AOI but
+  BOTH its download links return "Share not found" — a genuine dead link, not a network block;
+  recommended next step is emailing SANBI contact J.Currie@sanbi.org.za or retrying later (per the
+  standing lesson that this sandbox's link/network reachability is not fixed and has flipped
+  session-to-session before, e.g. Copernicus).
+- [2026-07-10] Follow-up on the above: tried to actually pull #14 (SA 100m bathy grid) and
+  re-check #3 (canyon shapefile) at repository.saeon.ac.za. Installed rasterio/fiona in the
+  sandbox but **the download never started — this session's sandbox proxy returns an explicit
+  `403 blocked-by-allowlist` for both `repository.saeon.ac.za` and `catalogue.saeon.ac.za`**,
+  confirmed domain-specific (github.com returned 200 in the same test batch, so it's not a
+  general outage). This is a different failure mode than the earlier research pass in the same
+  session, which reached SAEON's GraphQL/DataCite metadata APIs fine — the block appears to sit
+  specifically on the Nextcloud share-download paths, not the whole saeon.ac.za domain family.
+  Per the standing lesson (sandbox reachability isn't fixed, e.g. Copernicus flipped between
+  sessions) it's worth a retry later, but a `blocked-by-allowlist` proxy response reads as a
+  deliberate block rather than a transient one, so don't assume it'll clear on its own.
+  Practical path if this recurs: have Euan download the file via his own browser and drop it in
+  the project folder — gdalinfo/fiona inspection needs zero network access once the file is
+  local.
+- [2026-07-10] Photogrammetry scouting: the real, active Sodwana-specific project is SAAMBR/ORI's
+  "Virtual Reefs" (Sam Hofmeyr & Dr Dave Pearton) — GoPro-video SfM 3D reef reconstruction,
+  producing DEMs + rugosity metrics on actual Sodwana reefs, presented at SAMSS 2022 ("Photogrammetry
+  For Coral Reef Monitoring and Understanding Rugosity of Coral Reefs In South Africa") and written
+  up on saambr.org.za ("Virtual Reefs – recreating Sodwana Bay's coral reefs in 3D"). No public
+  dataset/repository found (no Zenodo/Figshare/Dryad hit, no peer-reviewed paper with a data
+  availability statement located) — as of this search it looks like an internal ORI research
+  effort, contact would have to go through SAAMBR/ORI directly. Nearest published analogue with an
+  open-access paper: Cerrano et al. 2017 (MDPI Remote Sensing 9(7):705, "High Resolution Orthomosaics
+  of African Coral Reefs") — but that's a 1655 m² SfM test site at Ponta do Ouro, Mozambique, ~55 km
+  north of our AOI's northern edge (lat -26.83 vs our -27.32 boundary), same soft-coral/Acropora reef
+  type as Sodwana so methodologically transferable but not a data source for our AOI. Not pursued
+  further (no files, no integration) — flagged here in case Euan wants to reach out to ORI/SAAMBR
+  for actual model exports (would be reef-surface detail/rugosity, not raw bathymetry, so any use
+  would be corroborative like the CGS reef mask, not a depth-fusion input).
+- [2026-07-10] Surveyed alternative *types* of data beyond more bathymetry surveys (full detail:
+  `reports/data_sources.md` "2026-07-10 addendum"). Best new lead: **S2Shores**
+  (github.com/CNES/S2Shores, Apache-2.0) — an open-source wave-kinematics bathymetry tool that derives
+  depth from wave dispersion physics on paired Sentinel-2 frames, NOT light penetration, so it doesn't
+  share our optical-wall failure mode. Runs on Sentinel-2 L1C products we already pull, takes our
+  `config/aoi.geojson` directly as a `--roi_file`, no login/cost. Its published companion global
+  product is validated at RMSE 2-5 m in the 10-40 m band (our exact 15-25 m gate failure), but that
+  published grid is only 1 km resolution (too coarse for reef detail, coarse-reference use only);
+  running the actual toolbox on our own 10 m scenes is untested — flagged as a bounded sdb-modeler
+  iteration for a future session (same pass/partial/no-improvement exit criteria as the existing
+  accuracy loop), not yet run. Also checked: Garmin Quickdraw Community (free crowdsourced recreational
+  sonar, needs an interactive account/map-click to check Sodwana coverage, not sandbox-testable); IHO
+  DCDB/NOAA NCEI (same `blocked-by-allowlist` sandbox pattern as SAEON earlier today — `ncei.noaa.gov`
+  and its ArcGIS REST endpoint are both blocked this session); DEA National Coastal Assessment LiDAR
+  (real SA government program, no Sodwana-specific public dataset found, contact-only lead like
+  Green/Ramsay). No files integrated, nothing downloaded.
+- [2026-07-10] Implemented Euan's top-2 recommended options from reports/data_sources.md.
+  **#1 de Wet & Compton (2021):** re-confirmed the prior rejection independently
+  (reports/eval_scratch/rmse_against_holdout.py against the existing data/raw/dewet_compton_points.csv):
+  RMSE 48.35 m (0-15m) / 334.76 m (15-25m) vs holdout — consistent with the already-documented
+  41/336m rejection (small numeric difference is noise, same catastrophic conclusion). Root cause
+  understood, not just observed: rasterio confirms the .grd's CRS/extent/resolution assumptions are
+  correct (bounds lon 12-36, lat -38..-24, ~333m cells, matches "EPSG:4326 implied"), so this is not a
+  georeferencing bug — it's a genuine resolution failure. A 333m national-shelf grid cannot resolve
+  Sodwana's canyon-adjacent reef terrain (canyons drop to -450m+ within a few km of 15-25m reef, per
+  the already-documented Green/Ramsay canyon surveys), so nearest-neighbour matching smears canyon
+  depth onto shallow holdout points. Same failure family as GEBCO/GMRT ("treat as smooth fill only,
+  never as detail"), just worse here since the AOI sits right on a canyon edge. Remains un-integrated.
+  **#2 Bathymetrix-AI (github.com/Nasef2017/Bathymetrix-AI):** ported both novel ideas and tested
+  end-to-end (pipeline/04 -> 05 -> validate.py), not just point-wise. RANSAC-filtering TRAIN photons
+  on the Stumpf log-ratio (drops ~8% as outliers) genuinely improved the 15-25m gate 4.90 -> 4.14m
+  (still FAILS the 2.5m cap, but a real ~15% reduction) while 0-15m stayed passing (1.37 -> 1.45,
+  thinner margin, cap 1.5). Kept enabled (`sdb.ransac_filter_enabled: true`). k-NN residual spatial-
+  stacking ("Phase 4") was tested alongside it (k=5,8,15) and REJECTED: no meaningful gain on 15-25m,
+  slightly hurt 0-15m at low k — documented in reports/accuracy_loop.md iteration 2, not wired in,
+  same honest-rejection pattern as Copernicus phy_wk. Also fixed a real reproducibility bug found
+  along the way: pipeline/04's XGBRegressor had no `random_state`, so re-running it without any real
+  change could silently produce different numbers by chance (confirmed: an unseeded reimplementation
+  reproduced the same qualitative pattern but different exact RMSE, e.g. 5.22m not 4.90m) — now seeded
+  from `sdb.split_seed`. New eval script: reports/eval_scratch/residual_correction_experiment.py.
+  **Mount bug found live in production files, not just reports:** `config/params.yaml` and
+  `pipeline/05_fuse_dem.py` were BOTH found silently truncated mid-statement on the bash-visible copy
+  (yaml.safe_load / py_compile both failed) despite the Read tool showing complete files — the same
+  truncation bug from the 2026-07-09 Gotcha, but it turns out the bash view of a large file can go
+  stale/truncated independent of *this session's* own edits (`05_fuse_dem.py` had not been touched
+  this session at all and was still broken on the bash side). Also separately, the Edit tool itself
+  re-truncated `pipeline/04_train_sdb.py` and `config/params.yaml` mid-session, twice, right after a
+  successful heredoc fix. Net practical rule that held up under repeated testing this session: for
+  files that are actually EXECUTED via bash (pipeline/*.py, config/*.yaml), only trust a `cat > file
+  <<'EOF'` heredoc rewrite, verified immediately after with `wc -c` + `py_compile`/`yaml.safe_load` —
+  never the Edit tool for these. For CLAUDE.md itself (never executed, only read), the Edit tool
+  and the Read tool stayed reliable and consistent all session; it was bash's `cat`/`wc -c` view of
+  THIS file specifically that lagged/staled — harmless since nothing runs it, but confusing if you
+  go looking for your own prior edits via bash instead of the Read tool. Also hit the documented
+  rasterio `Operation not permitted` overwrite issue in `pipeline/04_train_sdb.py` itself: it was
+  writing `sdb_10m.tif`/`sdb_uncertainty.tif` via raw `rasterio.open(path, "w", ...)` instead of
+  `_common.raster_writer` — fixed to match `05_fuse_dem.py`'s existing pattern.
+- [2026-07-10] Closed out the two crowdsourced-sonar leads flagged in the 2026-07-10 "alternative
+  data types" Gotcha (Garmin Quickdraw Community, C-MAP Genesis Social Map) — both are DEAD ENDS,
+  not sandbox-testable, and Euan confirmed he owns no compatible hardware. **Garmin Quickdraw:**
+  the old browser flow (connect.garmin.com/start/quickdraw/) now hard-redirects to the ActiveCaptain
+  app store page — confirmed live via Claude-in-Chrome navigate, not just a search claim. Community
+  contour download is app-only now (phone + free Garmin account, Quickdraw Community → Search for
+  Contours), and even then the output is a proprietary sync-to-chartplotter format with no
+  independent export step. **C-MAP Genesis Social Map:** genesismaps.com/Dashboard/socialmap loads
+  with NO login wall (confirmed live — defaulted to a real crowdsourced contour view over Cape Town,
+  so the SA region has at least some coverage), but the actual per-chart download is gated behind a
+  "Plotter Details" form requiring a real registered Lowrance/Simrad/B&G unit's Serial Number + 9-digit
+  alphanumeric Content ID (both read from the physical device's System→About screen) — there is no
+  account-only or web-only download path, this is a hard hardware gate, confirmed via screenshot Euan
+  sent, and Euan has no such unit. Neither source integrated, nothing downloaded. Lesson for future
+  crowdsourced-sonar leads (Navionics SonarChart Live has the same community-upload model): check for
+  a physical-device-registration requirement before spending session time on the web UI — both of
+  these looked like ordinary account-gated downloads until the actual download step.
+- [session 2026-07-25T07:05Z] review pipeline output; append real discoveries here.
+- [session 2026-07-25T11:53Z] review pipeline output; append real discoveries here.
+- [session 2026-07-25T14:53Z] review pipeline output; append real discoveries here.
+- [2026-07-25] **Retired Fusion1, adopted Fusion2, full site rewrite.** A sibling repo,
+  `EuanSwart/sodwana-reef-map` (checked out locally as `../Fable2`), is an independent rewrite of
+  this same project with a cleaner reconciled-DEM pipeline (ATL24 > Garmin > CGS > SDB > GMRT
+  inverse-variance fusion, 0 to -328 m, with a proper `fusion_reduced` low-confidence mask) and a
+  genuinely more polished site (glass-panel icon-button/sliding-sheet design, theme toggle, its own
+  localStorage-based "My dive sites"). Per Euan's explicit direction: made that DEM ("Fusion2") the
+  site's ONE primary depth layer — retired `site/tiles/` (old baseline), `site/tiles_fusion1*`, and
+  `pipeline/11*_fusion1*.py` entirely (deleted; the seam-smoothing fix from earlier this same session
+  is now moot since Fusion1 no longer exists) — and rebuilt `site/index.html`/`style.css`/`app.js`
+  from that sibling repo's design, porting in every Fable-only feature that design didn't have yet:
+  prospect leads, dive entry points, the admin sheet (sha256 password gate, curated
+  `dive_sites.geojson` CRUD/import/export — distinct from the sibling design's visitor-personal "My
+  dive sites"), route planning (depth-profile SVG + honesty warnings), and the measure tool. Data
+  files (`cgs_geology.geojson`, `contours.geojson` — supersedes the old separate isobaths layer —
+  `dive_sites.geojson`, `icesat2_tracks.geojson`, and the `tiles/relief`+`tiles/terrain` tile
+  pyramids) were copied from the sibling repo as-is; `prospects.geojson`/`dive_entries.geojson`
+  stayed from this repo. **Validation boundary, stated honestly:** Fusion2's accuracy (0-15 m RMSE
+  1.47 PASS; 15-25 m ~4.8 m documented data-limited waiver, shown hatched) is validated by the
+  sibling repo's OWN `pipeline/04_validate.py` and gates, not this repo's `validate.py` (which still
+  only knows about the old SDB/GEBCO fusion in `dem/sodwana_fused_10m_4326.tif` — untouched this
+  session, still PASS/FAIL 1.45/4.14 on its own inputs). This repo does not re-validate Fusion2; if
+  that DEM changes, re-check the sibling repo's own gates, don't assume.
+- [2026-07-25] Route/measure depth-sampling was rewritten to use `map.queryTerrainElevation()`
+  (same API the sibling design's own live depth-readout pill already used in production) instead of
+  the old maplibre-contour `DemSource.getDemTile()` tile-fetch approach — removes the
+  `vendor/index.mjs` dependency entirely (deleted, unused now) and works because the new `terrain`
+  raster-dem source uses the same `encoding:"terrarium"` Fable always used. Also: MapLibre's
+  `text-field` symbol layers throw "requires a style glyphs property" if the style has no `glyphs`
+  URL — the sibling design deliberately has NONE (all text, including route waypoint numbers, is
+  DOM `Marker` elements styled via the `.dlbl` class, not vector-tile symbol layers). Follow that
+  convention for any future on-map text; don't add a `text-field` layer without also wiring a real
+  glyphs endpoint.
+- [2026-07-25] The Windows-mount Write/Edit truncation gotcha (files >~6 KB) bit `site/app.js` again
+  (now ~63 KB) — writing directly via bash heredoc also failed this time with `ENAMETOOLONG` (the
+  whole heredoc command exceeded the shell's argv length limit). Fix that worked: `Write` the full
+  file to the session's scratchpad directory (a different mount, not subject to the truncation
+  quirk) via the Write tool, then `cp` it into `site/` with plain `cp` (a filesystem copy, not a
+  Write/Edit call, so the quirk never triggers) — verified byte-identical with `wc -c` before/after
+  and `node --check` for syntax. Use this path for any future single-file rewrite over ~6 KB;
+  smaller incremental `Edit` calls remain reliable regardless of total file size.
+- [2026-07-25] Adding 3 more top-bar icon buttons (measure/route/admin, on top of the sibling
+  design's original 4) overflowed the `.top-controls` row on mobile (375 px) enough to overlap the
+  brand card. Fixed with a mobile-only media-query change: `.top-controls` gets
+  `flex-wrap:wrap;justify-content:flex-end;max-width:calc(100vw - 100px)` (wraps to 2 rows, stays
+  right-anchored, never reaches into the brand's space) and the brand's subtitle/title text is
+  hidden below 640 px (just the logo mark shows) so there's no horizontal collision even before
+  wrapping. If more top-bar actions are added later, re-check this at 375 px before shipping.

@@ -1,311 +1,340 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8" />
-  <title>Sodwana Bay Bathymetry — Red Sands → Mabibi</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Free, high-resolution interactive seafloor map of Sodwana Bay for scuba training and reef prospecting. No API keys." />
-  <link href="vendor/maplibre-gl.css" rel="stylesheet"
-        onerror="this.onerror=null;this.href='https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.css';" />
-  <style>
-    :root {
-      /* ---- base chrome ---- */
-      --bg:#0a0f1c;
-      --panel:#0d1526e6;
-      --panel-solid:#0d1526;
-      --panel-2:#101d33;
-      --edge:#24406b;
-      --edge-soft:#1b2c4d;
-      --ink:#dfeaff;
-      --ink-dim:#8fb3e0;
-      --ink-faint:#7e9bc4;
-      --accent:#00e5ff;
-      --accent-press:#1b8fb0;
-      /* ---- shared depth ramp (mirrors style.json color-relief + app.js) ---- */
-      --depth-120:#050510;
-      --depth-60:#001f7a;
-      --depth-30:#0077ff;
-      --depth-10:#00e5ff;
-      --depth-0:#eafaff;
-      /* ---- categorical accents (harmonised) ---- */
-      --c-site:#ffd400;
-      --c-site-unverified:#ff9f6b;
-      --c-reef-prominent:#c1440e;
-      --c-reef:#e8722c;
-      --c-reef-scattered:#f2b134;
-      --c-sed-coarse:#b9a67d;
-      --c-sed-sand:#e3d7b4;
-      --c-track:#63e6c0;
-      --c-prospect:#ff5db1;
-      --c-prospect-ok:#4dff88;
-      --c-entry:#5ad1ff;
-      /* ---- type scale ---- */
-      --fs-xs:11px; --fs-sm:12px; --fs-md:13px; --fs-lg:15px;
-      /* ---- spacing / shape ---- */
-      --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px;
-      --radius:10px; --radius-sm:6px;
-      --shadow:0 6px 24px #00060f66;
-    }
-    html,body { margin:0; height:100%; background:var(--bg); color:var(--ink);
-      font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif; }
-    #map { position:absolute; inset:0; }
-
-    .panel { position:absolute; background:var(--panel); border:1px solid var(--edge);
-      border-radius:var(--radius); padding:10px 12px; backdrop-filter:blur(6px); box-shadow:var(--shadow);
-      /* MapLibre's own controls (nav/scale/attribution) set explicit z-index:2, which paints
-         above any z-index:auto element regardless of DOM order — without this our panels could
-         end up hidden behind them (surfaced by the legend's collapsed chip sinking into the
-         same corner as the attribution control). Keep all app panels above every native control. */
-      z-index:3; }
-
-    /* ---- sidebar ---- */
-    /* max-height leaves a bottom gutter (not just the top 24px inset) so a long site list
-       can't grow the panel down into the scale bar's bottom-left corner; overflow:auto
-       already scrolls the sidebar's own content within that cap. */
-    #sidebar { top:12px; left:12px; width:256px; max-height:calc(100% - 90px);
-      overflow:auto; transition:transform .28s cubic-bezier(.4,0,.2,1), opacity .22s ease; }
-    #sidebar.collapsed { transform:translateX(-118%); opacity:0; pointer-events:none; }
-    .sb-head { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--sp-2); }
-    #sidebar h1 { font-size:var(--fs-lg); margin:0 0 2px; letter-spacing:.2px; }
-    #sidebar .sub { font-size:var(--fs-xs); color:var(--ink-dim); margin-bottom:var(--sp-3); }
-    .section-title { font-size:var(--fs-xs); text-transform:uppercase; letter-spacing:.09em;
-      color:var(--ink-faint); margin:var(--sp-3) 0 var(--sp-1); font-weight:600; }
-
-    /* ---- collapsible sidebar sections ---- */
-    .sec { margin:0; }
-    .sec summary { display:flex; align-items:center; justify-content:space-between; cursor:pointer;
-      user-select:none; transition:color .12s; }
-    .sec summary::-webkit-details-marker { display:none; }
-    .sec summary::marker { content:''; }
-    .sec summary:hover { color:var(--accent); }
-    .sec .chev { width:10px; height:10px; flex:none; margin-left:6px; transition:transform .16s ease; }
-    .sec .chev path { stroke:currentColor; }
-    .sec[open] > summary .chev { transform:rotate(90deg); }
-    .sec > summary + * { margin-top:0; }
-
-    .iconbtn { flex:none; width:26px; height:26px; display:grid; place-items:center;
-      background:transparent; color:var(--ink-dim); border:1px solid var(--edge);
-      border-radius:var(--radius-sm); cursor:pointer; padding:0; transition:.15s; }
-    .iconbtn:hover { color:var(--accent); border-color:var(--accent); background:#0f2138; }
-    .iconbtn svg { width:14px; height:14px; }
-
-    /* collapsed-state opener */
-    #sb-open { top:12px; left:12px; width:34px; height:34px; }
-
-    .toggle { display:flex; align-items:center; gap:var(--sp-2); margin:6px 0; font-size:var(--fs-md);
-      cursor:pointer; user-select:none; padding:2px 4px; border-radius:var(--radius-sm); transition:background .12s; }
-    .toggle:hover { background:var(--edge-soft); }
-    .toggle input { accent-color:var(--accent); width:15px; height:15px; margin:0; cursor:pointer; }
-    .toggle .sw { width:11px; height:11px; border-radius:3px; flex:none; box-shadow:0 0 0 1px #0006 inset; }
-
-    #exwrap { margin:2px 0 4px 26px; font-size:var(--fs-sm); color:var(--ink-dim); }
-    #ex { width:100%; accent-color:var(--accent); }
-
-    .sites { padding:0; margin:var(--sp-1) 0; }
-    .sites li { list-style:none; padding:5px 8px; border-radius:var(--radius-sm); cursor:pointer;
-      display:flex; justify-content:space-between; align-items:baseline; gap:6px; transition:background .12s; }
-    .sites li:hover { background:var(--edge-soft); }
-    .sites li .nm { border-left:2px solid var(--c-site); padding-left:7px; }
-    .sites li.unverified .nm { border-left-color:var(--c-site-unverified); opacity:.75; font-style:italic; }
-    .sites li .d { font-size:var(--fs-xs); color:var(--ink-dim); white-space:nowrap; }
-
-    .note { font-size:var(--fs-xs); color:var(--ink-faint); margin-top:var(--sp-2); line-height:1.35; }
-    .note code { color:var(--ink-dim); }
-
-    /* ---- admin ---- */
-    #admin-bar { margin-top:var(--sp-3); padding-top:var(--sp-2); border-top:1px solid var(--edge); }
-    .linkbtn { background:transparent; border:none; color:var(--ink-faint); cursor:pointer;
-      font-size:var(--fs-sm); padding:2px 0; display:inline-flex; align-items:center; gap:6px; }
-    .linkbtn:hover { color:var(--accent); }
-    .btn { background:#12325c; color:var(--ink); border:1px solid #2e5a90; border-radius:var(--radius-sm);
-      padding:5px 10px; cursor:pointer; font-size:var(--fs-sm); transition:.14s; }
-    .btn:hover { background:#17457c; border-color:var(--accent); }
-    .btn.primary { background:#0e3d4a; border-color:#1f6f82; }
-    .btn.primary:hover { background:#12566a; border-color:var(--accent); }
-    #admin-panel { margin-top:var(--sp-2); }
-    .hidden { display:none; }
-    .admin-list { max-height:210px; overflow:auto; border:1px solid var(--edge); border-radius:var(--radius-sm);
-      padding:4px; margin:var(--sp-1) 0; background:#0a1424; }
-    .arow { display:flex; align-items:center; gap:6px; padding:3px 4px; border-radius:4px; }
-    .arow:hover { background:var(--edge-soft); }
-    .arow input[type=text] { flex:1; min-width:0; background:#0d1b30; border:1px solid var(--edge);
-      color:var(--ink); border-radius:4px; padding:3px 6px; font-size:var(--fs-sm); }
-    .arow input[type=text]:focus { outline:none; border-color:var(--accent); }
-    .arow input[type=checkbox] { accent-color:var(--accent); }
-    .admin-actions { display:flex; gap:6px; flex-wrap:wrap; margin:var(--sp-1) 0 var(--sp-2); }
-
-    /* ---- dive-site manager (import / manual add / edit / collections) ---- */
-    .collgroup { font-size:var(--fs-xs); text-transform:uppercase; letter-spacing:.07em; color:var(--ink-faint);
-      padding:6px 4px 3px; font-weight:600; border-top:1px solid var(--edge-soft); margin-top:2px; }
-    .collgroup:first-child { border-top:none; margin-top:0; }
-    .arow.site-row { align-items:flex-start; flex-wrap:wrap; }
-    .arow .expandbtn { flex:none; }
-    .site-edit { flex-basis:100%; display:grid; grid-template-columns:1fr 1fr; gap:5px 6px;
-      margin:6px 0 8px; padding:8px; background:#0a1424; border:1px solid var(--edge-soft); border-radius:6px; }
-    .site-edit .full { grid-column:1 / -1; }
-    .site-edit label { font-size:10px; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.05em;
-      display:block; margin-bottom:2px; }
-    .site-edit input, .site-edit select, .site-edit textarea {
-      width:100%; box-sizing:border-box; background:#0d1b30; border:1px solid var(--edge); color:var(--ink);
-      border-radius:4px; padding:4px 6px; font-size:var(--fs-sm); font-family:inherit; }
-    .site-edit input:focus, .site-edit select:focus, .site-edit textarea:focus { outline:none; border-color:var(--accent); }
-    .site-edit textarea { resize:vertical; min-height:36px; }
-    .import-form, .add-form { display:flex; flex-direction:column; gap:6px; margin:var(--sp-1) 0 var(--sp-2);
-      padding:8px; background:#0a1424; border:1px solid var(--edge-soft); border-radius:6px; }
-    .import-form .row2, .add-form .row2 { display:flex; gap:6px; }
-    .import-form .row2 > *, .add-form .row2 > * { flex:1; min-width:0; }
-    .filepick { display:flex; align-items:center; gap:8px; }
-    .filepick .fname { font-size:var(--fs-xs); color:var(--ink-faint); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .import-status { font-size:var(--fs-xs); color:var(--ink-dim); }
-    .import-status.err { color:#ff9098; }
-
-    /* ---- readout ---- */
-    #readout { bottom:8px; left:50%; transform:translateX(-50%); font-variant-numeric:tabular-nums;
-      padding:5px 10px; font-size:var(--fs-xs); background:var(--panel); opacity:.72; transition:opacity .15s; }
-    #readout:hover { opacity:1; }
-    #readout .k { color:var(--ink-faint); font-size:var(--fs-xs); text-transform:uppercase; letter-spacing:.08em; }
-    #readout button { margin-top:6px; }
-
-    /* ---- legend ---- */
-    .legend { bottom:12px; right:12px; width:172px; }
-    .legend .lt { font-size:var(--fs-sm); font-weight:600; display:flex; align-items:center; justify-content:space-between;
-      cursor:pointer; user-select:none; }
-    /* Same convention as .sec's chevron: pointing down = expanded, pointing right = collapsed. */
-    .legend .lt .chev { width:10px; height:10px; flex:none; margin-left:6px; transition:transform .16s ease; transform:rotate(90deg); }
-    .legend .lt .chev path { stroke:currentColor; }
-    .legend.collapsed .lt .chev { transform:rotate(0deg); }
-    .legend.collapsed { width:auto; }
-    .legend.collapsed .legend-body { display:none; }
-    .legend .bar { height:11px; border-radius:3px; margin:6px 0 3px;
-      background:linear-gradient(90deg,
-        var(--depth-120) 0%, var(--depth-60) 50%, var(--depth-30) 75%,
-        var(--depth-10) 91.7%, var(--depth-0) 100%); box-shadow:0 0 0 1px #0006 inset; }
-    .legend .row { display:flex; justify-content:space-between; font-size:var(--fs-xs); color:var(--ink-dim); }
-    .legend .foot { font-size:10px; color:var(--ink-faint); margin-top:5px; line-height:1.3; }
-
-    /* ---- scale control (MapLibre-native, restyled to match dark theme) ---- */
-    .maplibregl-ctrl-bottom-left { margin-bottom: 12px; margin-left: 12px; }
-    .maplibregl-ctrl-scale {
-      background: var(--panel); border: 1px solid var(--edge); color: var(--ink-dim);
-      border-radius: var(--radius-sm); backdrop-filter: blur(6px); font-size: var(--fs-xs);
-      padding: 2px 6px;
-    }
-
-    /* ---- admin preview-as-visitor banner ---- */
-    /* NB: uses :not(.hidden) rather than a bare `display:flex` on #preview-banner
-       because an ID selector's specificity would otherwise beat the shared
-       `.hidden { display:none }` class rule and the banner would never hide. */
-    #preview-banner { top:12px; left:50%; transform:translateX(-50%); z-index:10;
-      align-items:center; gap:10px; }
-    #preview-banner:not(.hidden) { display:flex; }
-
-    /* ---- popups ---- */
-    .maplibregl-popup-content { background:var(--panel-solid); color:var(--ink); border:1px solid #2e5a90;
-      border-radius:var(--radius-sm); font-size:var(--fs-md); box-shadow:var(--shadow); padding:10px 12px; }
-    .maplibregl-popup-content b { color:#fff; }
-    .maplibregl-popup-content button { background:#12325c; color:var(--ink); border:1px solid #2e5a90;
-      border-radius:5px; padding:3px 7px; cursor:pointer; margin:4px 3px 0 0; font-size:var(--fs-sm); }
-    .maplibregl-popup-content button:hover { border-color:var(--accent); }
-    .maplibregl-popup-tip { border-top-color:var(--panel-solid) !important; }
-    .maplibregl-popup-close-button { color:var(--ink-dim); }
-
-    a { color:var(--accent); }
-
-    /* ---- route planning panels ---- */
-    #route-hud { text-align:center; }
-    #route-hud .note { margin-top:0; }
-    #route-export-text { background:var(--panel-2); border:1px solid var(--edge); color:var(--ink);
-      border-radius:var(--radius-sm); padding:8px; font:12px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
-      resize:vertical; }
-    #route-export-text:focus { outline:none; border-color:var(--accent); }
-    #route-summary-body { font-size:var(--fs-md); }
-  </style>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="description" content="High-resolution seafloor and reef map of Sodwana Bay, South Africa." />
+  <title>Sodwana Bay Bathymetry</title>
+  <link rel="stylesheet" href="vendor/maplibre-gl.css" />
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="map"></div>
+  <div id="map" aria-label="Interactive seafloor map of Sodwana Bay"></div>
 
-  <div id="preview-banner" class="panel hidden">
+  <!-- Top brand bar -->
+  <header class="panel brand" id="brand">
+    <div class="brand-mark" aria-hidden="true"></div>
+    <div class="brand-text">
+      <h1>Sodwana Bay</h1>
+      <p>Reef &amp; Seafloor Map</p>
+    </div>
+  </header>
+
+  <!-- Preview-as-visitor banner (admin only) -->
+  <div class="panel previewbar hidden" id="previewbar">
     <span>Viewing as a public visitor</span>
-    <button id="preview-banner-exit" class="btn">Exit preview</button>
+    <button class="btn small" id="previewbar-exit" type="button">Exit preview</button>
   </div>
 
-  <button id="sb-open" class="panel iconbtn" hidden title="Show panel" aria-label="Show panel">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
-  </button>
+  <!-- Top-right control cluster -->
+  <div class="top-controls">
+    <button class="iconbtn" id="btn-theme" type="button" aria-label="Toggle light or dark theme" title="Toggle theme">
+      <span class="ic ic-moon" aria-hidden="true"></span>
+    </button>
+    <button class="iconbtn" id="btn-about" type="button" aria-label="About and accuracy information" title="About &amp; accuracy">
+      <span class="ic ic-info" aria-hidden="true">i</span>
+    </button>
+    <button class="iconbtn" id="btn-measure" type="button" aria-label="Measure distance" aria-pressed="false" title="Measure distance">
+      <span class="ic ic-ruler" aria-hidden="true"></span>
+    </button>
+    <button class="iconbtn" id="btn-route" type="button" aria-label="Plan a dive route" aria-pressed="false" title="Plan route">
+      <span class="ic ic-route" aria-hidden="true"></span>
+    </button>
+    <button class="iconbtn accent" id="btn-layers" type="button" aria-label="Show layers panel" aria-expanded="false" aria-controls="layers" title="Layers">
+      <span class="ic ic-layers" aria-hidden="true"></span>
+    </button>
+    <button class="iconbtn" id="btn-mysites" type="button" aria-label="My dive sites" aria-expanded="false" aria-controls="mysites" title="My dive sites">
+      <span class="ic ic-pin" aria-hidden="true"></span>
+    </button>
+    <button class="iconbtn" id="btn-admin" type="button" aria-label="Site owner tools" aria-expanded="false" aria-controls="admin" title="Admin">
+      <span class="ic ic-lock" aria-hidden="true"></span>
+    </button>
+  </div>
 
-  <div id="sidebar" class="panel">
-    <div class="sb-head">
-      <div>
-        <h1>Sodwana Bay Bathymetry</h1>
-        <div class="sub">Red Sands → Mabibi · free data · honest to ~3 m/px</div>
+  <!-- Layers panel -->
+  <section class="panel sheet" id="layers" role="dialog" aria-label="Map layers" aria-modal="false" hidden>
+    <div class="sheet-head">
+      <h2>Layers</h2>
+      <button class="iconbtn ghost" id="layers-close" type="button" aria-label="Close layers panel">&times;</button>
+    </div>
+    <div class="sheet-body">
+      <label class="row toggle">
+        <span class="row-label">Colour relief</span>
+        <input type="checkbox" id="t-relief" checked />
+        <span class="switch" aria-hidden="true"></span>
+      </label>
+      <label class="row toggle">
+        <span class="row-label">Depth contours</span>
+        <input type="checkbox" id="t-contours" checked />
+        <span class="switch" aria-hidden="true"></span>
+      </label>
+      <label class="row toggle">
+        <span class="row-label">Dive sites</span>
+        <input type="checkbox" id="t-sites" checked />
+        <span class="switch" aria-hidden="true"></span>
+      </label>
+      <label class="row toggle">
+        <span class="row-label">My dive sites</span>
+        <input type="checkbox" id="t-user-sites" checked />
+        <span class="switch" aria-hidden="true"></span>
+      </label>
+      <label class="row toggle">
+        <span class="row-label">Dive entry points</span>
+        <input type="checkbox" id="t-entries" />
+        <span class="switch" aria-hidden="true"></span>
+      </label>
+      <label class="row toggle">
+        <span class="row-label">Prospect leads</span>
+        <input type="checkbox" id="t-prospects" />
+        <span class="switch" aria-hidden="true"></span>
+      </label>
+      <label class="row toggle">
+        <span class="row-label">Lidar tracks</span>
+        <input type="checkbox" id="t-lidar" />
+        <span class="switch" aria-hidden="true"></span>
+      </label>
+      <label class="row toggle">
+        <span class="row-label">Seafloor geology (CGS)</span>
+        <input type="checkbox" id="t-geology" />
+        <span class="switch" aria-hidden="true"></span>
+      </label>
+      <label class="row toggle">
+        <span class="row-label">3D terrain</span>
+        <input type="checkbox" id="t-3d" />
+        <span class="switch" aria-hidden="true"></span>
+      </label>
+      <div class="row slider" id="exag-row" hidden>
+        <span class="row-label">Exaggeration <b id="exag-val">1.5&times;</b></span>
+        <input type="range" id="exag" min="1" max="3" step="0.1" value="1.5" aria-label="Terrain exaggeration" />
       </div>
-      <button id="sb-collapse" class="iconbtn" title="Hide panel" aria-label="Hide panel">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg>
-      </button>
+
+      <div class="legend">
+        <h3>Depth</h3>
+        <div class="ramp" id="ramp" role="img" aria-label="Bathymetric colour ramp from 0 to minus 80 metres"></div>
+        <div class="ramp-labels"><span>0 m</span><span>&minus;40 m</span><span>&minus;80 m</span></div>
+        <div class="legend-key">
+          <span class="hatch-swatch" aria-hidden="true"></span>
+          <span>Reduced-confidence (15&ndash;25 m optical wall / sparse data)</span>
+        </div>
+        <div class="legend-key">
+          <span class="line-swatch dashed" aria-hidden="true"></span>
+          <span>Dashed contour = data-limited</span>
+        </div>
+        <h3 class="legend-sub">CGS substrate</h3>
+        <div class="legend-key">
+          <span class="geo-swatch" style="background:#c1440e" aria-hidden="true"></span>
+          <span>Prominent reef</span>
+        </div>
+        <div class="legend-key">
+          <span class="geo-swatch" style="background:#e8722c" aria-hidden="true"></span>
+          <span>Reef</span>
+        </div>
+        <div class="legend-key">
+          <span class="geo-swatch" style="background:#f2b134" aria-hidden="true"></span>
+          <span>Scattered reef</span>
+        </div>
+        <div class="legend-key">
+          <span class="geo-swatch" style="background:#b9a67d" aria-hidden="true"></span>
+          <span>Coarse shelly sediment</span>
+        </div>
+        <div class="legend-key">
+          <span class="geo-swatch" style="background:#e3d7b4" aria-hidden="true"></span>
+          <span>Sand</span>
+        </div>
+      </div>
     </div>
+  </section>
 
-    <details id="sec-layers" class="sec" open>
-      <summary class="section-title">Layers<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></summary>
-      <div id="toggle-3d"></div>
-      <div id="exwrap" hidden>Exaggeration <span id="exval">1.6×</span>
-        <input type="range" id="ex" min="1" max="3" step="0.1" value="1.6"></div>
-      <div id="toggles"></div>
-    </details>
+  <!-- My dive sites panel -->
+  <section class="panel sheet" id="mysites" role="dialog" aria-label="My dive sites" aria-modal="false" hidden>
+    <div class="sheet-head">
+      <h2>My dive sites</h2>
+      <button class="iconbtn ghost" id="mysites-close" type="button" aria-label="Close my dive sites panel">&times;</button>
+    </div>
+    <div class="sheet-body">
 
-    <details id="sec-sites" class="sec" open>
-      <summary class="section-title">Reefs &amp; dive sites<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></summary>
-      <ul id="site-list" class="sites"></ul>
-    </details>
-    <div class="note" id="data-note"></div>
+      <div class="ms-section">
+        <h3>Collections</h3>
+        <div class="ms-collections" id="ms-collections"></div>
+        <form class="ms-newcol" id="ms-newcol-form">
+          <input type="text" id="ms-newcol-name" placeholder="New collection name" maxlength="60" />
+          <button class="btn small" type="submit">+ Add</button>
+        </form>
+      </div>
 
-    <div id="admin-bar">
-      <button id="admin-link" class="linkbtn" title="Site owner tools">
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
-        Admin
-      </button>
-      <div id="admin-panel" class="hidden"></div>
+      <div class="ms-section" id="ms-add-section">
+        <h3 id="ms-add-heading">Add a site</h3>
+        <p class="ms-hint" id="ms-add-hint" hidden>Select or create a personal collection above to add sites.</p>
+        <form id="ms-add-form">
+          <input type="text" id="ms-f-name" placeholder="Site name" maxlength="80" />
+          <div class="ms-form-row">
+            <input type="text" id="ms-f-lat" placeholder="Latitude, e.g. -27.44" inputmode="decimal" />
+            <input type="text" id="ms-f-lon" placeholder="Longitude, e.g. 32.72" inputmode="decimal" />
+          </div>
+          <div class="ms-form-row">
+            <input type="text" id="ms-f-dmin" placeholder="Depth min (m)" inputmode="decimal" />
+            <input type="text" id="ms-f-dmax" placeholder="Depth max (m)" inputmode="decimal" />
+          </div>
+          <textarea id="ms-f-desc" placeholder="Description (optional)" maxlength="400" rows="2"></textarea>
+          <div class="ms-error" id="ms-add-error" hidden></div>
+          <div class="ms-form-actions">
+            <button class="btn accent" id="ms-add-submit" type="submit">Add site</button>
+            <button class="btn ghost" id="ms-add-cancel" type="button" hidden>Cancel</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="ms-section" id="ms-import-section">
+        <h3>Import file</h3>
+        <p class="ms-hint">CSV or GeoJSON points. Creates a new collection named after the file. Rows with bad or missing coordinates are skipped and reported below.</p>
+        <input type="file" id="ms-file" accept=".csv,.geojson,.json" />
+        <div class="ms-import-report" id="ms-import-report" hidden></div>
+      </div>
+
+      <div class="ms-section">
+        <div class="ms-list-head">
+          <h3 id="ms-list-title">Sites</h3>
+        </div>
+        <div class="ms-list-actions">
+          <button class="btn ghost small" id="ms-select-all" type="button">Select all</button>
+          <button class="btn ghost small" id="ms-export-geojson" type="button">Export GeoJSON</button>
+          <button class="btn ghost small" id="ms-export-csv" type="button">Export CSV</button>
+        </div>
+        <div class="ms-sites" id="ms-sites"></div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Admin panel (site owner only) -->
+  <section class="panel sheet" id="admin" role="dialog" aria-label="Site owner tools" aria-modal="false" hidden>
+    <div class="sheet-head">
+      <h2>Admin</h2>
+      <button class="iconbtn ghost" id="admin-close" type="button" aria-label="Close admin panel">&times;</button>
+    </div>
+    <div class="sheet-body">
+      <div id="admin-locked">
+        <p class="ms-hint">Site owner tools: curate the official dive-site list, control which layers visitors see, and export changes to publish.</p>
+        <button class="btn accent" id="admin-unlock" type="button">Unlock</button>
+      </div>
+      <div id="admin-unlocked" hidden>
+        <div class="ms-section" style="margin-top:0;padding-top:0;border-top:none">
+          <div class="ms-form-actions">
+            <button class="btn small" id="admin-preview" type="button">Preview as visitor</button>
+            <button class="btn small" id="admin-lock" type="button">Lock</button>
+          </div>
+        </div>
+
+        <div class="ms-section">
+          <h3>Import official sites</h3>
+          <p class="ms-hint">CSV or GeoJSON points. Added to the official dataset shipped to every visitor.</p>
+          <input type="file" id="ad-file" accept=".csv,.geojson,.json" />
+          <div class="ms-import-report" id="ad-import-report" hidden></div>
+        </div>
+
+        <div class="ms-section">
+          <h3>Add an official site</h3>
+          <form id="ad-add-form">
+            <input type="text" id="ad-f-name" placeholder="Site name" maxlength="80" />
+            <div class="ms-form-row">
+              <input type="text" id="ad-f-lat" placeholder="Latitude, e.g. -27.44" inputmode="decimal" />
+              <input type="text" id="ad-f-lon" placeholder="Longitude, e.g. 32.72" inputmode="decimal" />
+            </div>
+            <div class="ms-form-row">
+              <input type="text" id="ad-f-dmin" placeholder="Depth min (m)" inputmode="decimal" />
+              <input type="text" id="ad-f-dmax" placeholder="Depth max (m)" inputmode="decimal" />
+            </div>
+            <input type="text" id="ad-f-coll" placeholder="Collection (optional)" />
+            <textarea id="ad-f-desc" placeholder="Description (optional)" maxlength="400" rows="2"></textarea>
+            <div class="ms-error" id="ad-add-error" hidden></div>
+            <div class="ms-form-actions">
+              <button class="btn accent" id="ad-add-submit" type="submit">Add site</button>
+              <button class="btn ghost" id="ad-add-cancel" type="button" hidden>Cancel</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="ms-section">
+          <div class="ms-list-head"><h3>Official sites</h3></div>
+          <div class="ms-list-actions">
+            <button class="btn ghost small" id="ad-select-all" type="button">Select all</button>
+            <button class="btn ghost small" id="ad-export-all" type="button">Export all</button>
+            <button class="btn ghost small" id="ad-export-sel" type="button">Export selected</button>
+          </div>
+          <div class="ms-sites" id="ad-sites"></div>
+        </div>
+
+        <div class="ms-section">
+          <h3>Visitor layers &mdash; visible to everyone</h3>
+          <div id="ad-layers"></div>
+          <div class="ms-form-actions">
+            <button class="btn ghost small" id="ad-export-config" type="button">Export layer_config.json</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Route planning HUD (shown while placing waypoints) -->
+  <div class="panel hud" id="route-hud" hidden>
+    <div class="hud-stats" id="route-hud-stats">0 points &middot; 0 m</div>
+    <div class="hud-actions">
+      <button class="btn small" id="route-cancel" type="button">Cancel</button>
+      <button class="btn small accent" id="route-confirm" type="button" disabled>Confirm route</button>
     </div>
   </div>
 
-  <div id="readout" class="panel">
-    <div class="k">Cursor</div>
-    <div id="cursor">lat —, lon —</div>
-    <div id="clicked" style="color:var(--ink-dim);margin-top:4px">click the map to pin a coordinate</div>
-    <button id="copybtn" class="btn" hidden>Copy coords</button>
-  </div>
+  <!-- Route summary modal -->
+  <section class="panel modal" id="route-summary" role="dialog" aria-label="Planned route" aria-modal="true" hidden>
+    <div class="sheet-head">
+      <h2>Planned route</h2>
+      <button class="iconbtn ghost" id="route-summary-close" type="button" aria-label="Close route summary">&times;</button>
+    </div>
+    <div class="sheet-body prose" id="route-summary-body"></div>
+    <div class="sheet-body" style="padding-top:0">
+      <textarea id="route-export-text" readonly hidden></textarea>
+      <div class="ms-form-actions">
+        <button class="btn small" id="route-export-copy" type="button" hidden>Copy report</button>
+        <button class="btn small accent" id="route-summary-export" type="button">Export report</button>
+      </div>
+    </div>
+  </section>
 
-  <div class="legend panel">
-    <div class="lt" id="legend-head">Depth (m)<svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></div>
-    <div class="legend-body">
-      <div class="bar"></div>
-      <div class="row"><span>−120</span><span>−60</span><span>0</span></div>
-      <div class="foot">Colour-relief DEM &amp; CGS isobaths share this blue→cyan depth scale. Land renders transparent.</div>
+  <!-- Measure HUD -->
+  <div class="panel hud" id="measure-hud" hidden>
+    <div class="hud-stats" id="measure-hud-stats">Click the map to start measuring</div>
+    <div class="hud-actions">
+      <button class="btn small" id="measure-done" type="button">Done</button>
     </div>
   </div>
 
-  <div id="route-hud" class="panel hidden" style="top:12px; left:50%; transform:translateX(-50%);">
-    <div id="route-hud-stats" class="note">0 points · 0 m</div>
-    <div style="display:flex; gap:8px; margin-top:6px;">
-      <button id="route-cancel" class="btn">Cancel</button>
-      <button id="route-confirm" class="btn primary" disabled>Confirm Route</button>
+  <!-- About panel -->
+  <section class="panel modal" id="about" role="dialog" aria-label="About and accuracy" aria-modal="true" hidden>
+    <div class="sheet-head">
+      <h2>About &amp; accuracy</h2>
+      <button class="iconbtn ghost" id="about-close" type="button" aria-label="Close about panel">&times;</button>
     </div>
+    <div class="sheet-body prose">
+      <p>Depths fuse ICESat-2 lidar, cleaned recreational sonar (~1M soundings), CGS survey isobaths and Sentinel-2 satellite bathymetry into one reconciled model.</p>
+      <p>Validated against held-out lidar: <b>0&ndash;15 m RMSE 1.47 m</b>. The 15&ndash;25 m band is data-limited (RMSE ~4.8 m) and shown hatched as reduced-confidence until multibeam survey data is available.</p>
+      <p>Depths are negative metres below chart datum.</p>
+      <p class="warn">Not for navigation.</p>
+      <p class="byline">Sodwana Bay, South Africa &middot; by Euan Swart</p>
+    </div>
+  </section>
+
+  <!-- Depth readout pill -->
+  <div class="readout panel" id="readout" role="status" aria-live="polite">
+    <span class="ro-depth" id="ro-depth">Depth: &mdash;</span>
+    <span class="ro-sep" aria-hidden="true"></span>
+    <span class="ro-ll" id="ro-ll">&mdash;, &mdash;</span>
   </div>
 
-  <div id="route-summary" class="panel hidden" style="top:12px; right:56px; width:320px; max-height:calc(100% - 24px); overflow:auto;">
-    <div class="sb-head" style="margin-bottom:8px;">
-      <div><strong>Planned route</strong></div>
-    </div>
-    <div id="route-summary-body"></div>
-    <textarea id="route-export-text" readonly hidden style="width:100%; min-height:120px; margin-top:8px;"></textarea>
-    <div style="display:flex; gap:8px; margin-top:10px;">
-      <button id="route-export-copy" class="btn" hidden>Copy</button>
-      <button id="route-summary-close" class="btn">Close</button>
-      <button id="route-summary-export" class="btn primary">Export</button>
-    </div>
-  </div>
+  <div class="scrim" id="scrim" hidden></div>
 
-  <script src="vendor/maplibre-gl.js"
-    onerror="var s=document.createElement('script');s.src='https://unpkg.com/maplibre-gl@5.6.0/dist/maplibre-gl.js';s.onload=function(){window.__mlReady&&window.__mlReady()};document.head.appendChild(s);"></script>
-  <script type="module" src="app.js"></script>
+  <script src="vendor/maplibre-gl.js"></script>
+  <script src="route.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
