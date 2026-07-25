@@ -441,3 +441,37 @@ Interrupt him only for: his GPS points CSV, GEE auth (if used), GitHub repo/Page
   right-anchored, never reaches into the brand's space) and the brand's subtitle/title text is
   hidden below 640 px (just the logo mark shows) so there's no horizontal collision even before
   wrapping. If more top-bar actions are added later, re-check this at 375 px before shipping.
+- [session 2026-07-25T16:56Z] review pipeline output; append real discoveries here.
+- [2026-07-25] **Found and fixed the "shattered tile" / spike rendering bug Euan flagged.** Root
+  cause was in the sibling repo's `pipeline/06_make_tiles.py:build_terrarium()`: nodata cells are
+  hidden from the *visual* relief layer via alpha=0, but MapLibre's TERRAIN MESH ignores alpha and
+  uses the decoded RGB elevation regardless — nodata decoded to exactly -32768 m, so any pixel next
+  to real seafloor (~-20 m) became a ~32,748 m vertical cliff in the mesh. Since `map.setTerrain()`
+  is always active (needed for `queryTerrainElevation()` depth reads, not just the 3D toggle), this
+  distorted the "2D" view too, not only 3D. Two-part fix: (1) `set3D()`/the initial `map.on('load')`
+  now use `exaggeration: 0` in the non-3D state (flattens the mesh completely for 2D; does NOT
+  affect `queryTerrainElevation({exaggerated:false})` readings — that flag always returns the raw
+  decoded value independent of the terrain's configured exaggeration). (2) Regenerated
+  `site/tiles/terrain/` (`reports/eval_scratch/fix_terrain_tiles.py`, one-off, needs the sibling
+  repo's `dem/fusion_depth_4326.tif` checked out at `../Fable2`) with nodata cells given the NEAREST
+  real value within 15 px (~150 m) — smooth coastal transition instead of a cliff — and, separately,
+  a second nodata path found while verifying: tile-boundary "boundless" reads at low zoom (a z8 tile
+  spans ~156 km, well past the ~22×33 km AOI) fill out-of-mosaic pixels via `fill_value=0`, which
+  ALSO decodes to -32768 — fixed by forcing every alpha=0 pixel (real nodata OR boundless fill) to
+  encode exactly 0 m post-tiling, so no tile can ever contain an extreme value regardless of why a
+  pixel is invalid. Verified exhaustively (not just spot-checked): scanned all 682 regenerated
+  tiles' decoded elevation — max absolute value is now 328 m (matches the DEM's real max depth),
+  down from 32768 m. This same architecture bug (alpha-based nodata + terrain-ignores-alpha) likely
+  exists in the sibling repo's own site too if it's ever used at a zoomed-out 3D view spanning tile
+  edges or large land masses — worth flagging upstream. Relief tiles were NOT touched (their
+  alpha-based nodata is genuinely honored by the plain `raster` layer type, no mesh involved).
+- [2026-07-25] This session's live-preview verification hit a real tooling limit worth recording:
+  the preview browser tab went to `document.hidden=true`/`visibilityState:"hidden"` mid-session
+  (confirmed via `requestAnimationFrame` never firing even once, for a brand-new minimal test map
+  with zero relation to this site) and stayed that way through multiple full `preview_stop`/
+  `preview_start` cycles, different server configs/ports, and hard navigations — nothing available
+  fixed it (browsers deliberately can't be un-backgrounded from in-page JS; `window.focus()` is a
+  no-op for this). The terrain-tile fix above was therefore verified via direct numeric inspection
+  of the decoded tile data (Python/PIL/numpy), not a live screenshot — treat that as a real but
+  lower-confidence verification tier than the usual screenshot workflow, and re-screenshot once the
+  preview tab is confirmed visible again in a future session.

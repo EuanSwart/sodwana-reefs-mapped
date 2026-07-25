@@ -154,6 +154,7 @@
     attributionControl: false, hash: true
   });
   window.__map = map;
+  map.on('error', function (e) { console.warn('map resource issue (non-fatal):', e && e.error && e.error.message); });
 
   map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
   map.addControl(new maplibregl.ScaleControl({ maxWidth: 110, unit: 'metric' }), 'bottom-left');
@@ -168,7 +169,9 @@
   function isEffectiveAdmin() { return state.adminMode && !state.previewAsVisitor; }
 
   map.on('load', function () {
-    map.setTerrain({ source: 'terrain', exaggeration: 1 });
+    // exaggeration 0 (not 1) in the default 2D view — see the comment in set3D() for why:
+    // nonzero exaggeration displaces the mesh at nodata/land edges into visible spikes.
+    map.setTerrain({ source: 'terrain', exaggeration: 0 });
     wireLayerToggles();
     wireDepthReadout();
     wireGeologyPopups();
@@ -229,7 +232,15 @@
       map.setTerrain({ source: 'terrain', exaggeration: state.exag });
       map.easeTo({ pitch: 62, duration: 700 });
     } else {
-      map.setTerrain({ source: 'terrain', exaggeration: 1 });
+      // exaggeration 0, not 1: nodata/land cells in the terrain tile decode via their
+      // ALPHA channel (see pipeline/06_make_tiles.py's build_terrarium), not a value
+      // sentinel, so a fully-transparent pixel's RGB still decodes to a real (very
+      // negative) elevation. With any nonzero exaggeration that displaces the terrain
+      // mesh even at pitch 0, producing wild spiked/shattered geometry at nodata edges.
+      // Zero exaggeration flattens the mesh completely for the 2D view; it does not
+      // affect queryTerrainElevation() readings since every call here passes
+      // {exaggerated:false} (raw decoded value, independent of this setting).
+      map.setTerrain({ source: 'terrain', exaggeration: 0 });
       map.easeTo({ pitch: 0, bearing: 0, duration: 700 });
     }
   }
