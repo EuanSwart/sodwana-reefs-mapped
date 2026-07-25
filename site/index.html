@@ -134,6 +134,31 @@
     .arow input[type=checkbox] { accent-color:var(--accent); }
     .admin-actions { display:flex; gap:6px; flex-wrap:wrap; margin:var(--sp-1) 0 var(--sp-2); }
 
+    /* ---- dive-site manager (import / manual add / edit / collections) ---- */
+    .collgroup { font-size:var(--fs-xs); text-transform:uppercase; letter-spacing:.07em; color:var(--ink-faint);
+      padding:6px 4px 3px; font-weight:600; border-top:1px solid var(--edge-soft); margin-top:2px; }
+    .collgroup:first-child { border-top:none; margin-top:0; }
+    .arow.site-row { align-items:flex-start; flex-wrap:wrap; }
+    .arow .expandbtn { flex:none; }
+    .site-edit { flex-basis:100%; display:grid; grid-template-columns:1fr 1fr; gap:5px 6px;
+      margin:6px 0 8px; padding:8px; background:#0a1424; border:1px solid var(--edge-soft); border-radius:6px; }
+    .site-edit .full { grid-column:1 / -1; }
+    .site-edit label { font-size:10px; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.05em;
+      display:block; margin-bottom:2px; }
+    .site-edit input, .site-edit select, .site-edit textarea {
+      width:100%; box-sizing:border-box; background:#0d1b30; border:1px solid var(--edge); color:var(--ink);
+      border-radius:4px; padding:4px 6px; font-size:var(--fs-sm); font-family:inherit; }
+    .site-edit input:focus, .site-edit select:focus, .site-edit textarea:focus { outline:none; border-color:var(--accent); }
+    .site-edit textarea { resize:vertical; min-height:36px; }
+    .import-form, .add-form { display:flex; flex-direction:column; gap:6px; margin:var(--sp-1) 0 var(--sp-2);
+      padding:8px; background:#0a1424; border:1px solid var(--edge-soft); border-radius:6px; }
+    .import-form .row2, .add-form .row2 { display:flex; gap:6px; }
+    .import-form .row2 > *, .add-form .row2 > * { flex:1; min-width:0; }
+    .filepick { display:flex; align-items:center; gap:8px; }
+    .filepick .fname { font-size:var(--fs-xs); color:var(--ink-faint); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .import-status { font-size:var(--fs-xs); color:var(--ink-dim); }
+    .import-status.err { color:#ff9098; }
+
     /* ---- readout ---- */
     #readout { bottom:8px; left:50%; transform:translateX(-50%); font-variant-numeric:tabular-nums;
       padding:5px 10px; font-size:var(--fs-xs); background:var(--panel); opacity:.72; transition:opacity .15s; }

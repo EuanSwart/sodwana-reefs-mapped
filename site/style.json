@@ -3,57 +3,65 @@
   "name": "Sodwana Bathymetry",
   "glyphs": "https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf",
   "sources": {
-    "basemap": {
-      "type": "vector",
-      "url": "https://tiles.openfreemap.org/planet"
-    },
+    "basemap": { "type": "vector", "url": "https://tiles.openfreemap.org/planet" },
     "terrain-dem": {
       "type": "raster-dem",
       "tiles": ["tiles/xyz/{z}/{x}/{y}.png"],
-      "encoding": "terrarium",
-      "tileSize": 256,
-      "minzoom": 8,
-      "maxzoom": 15,
+      "encoding": "terrarium", "tileSize": 256, "minzoom": 8, "maxzoom": 15,
       "bounds": [32.62, -27.62, 32.82, -27.32],
       "attribution": "Bathymetry: Sentinel-2 SDB x ICESat-2 ATL24 x CGS 2005 x GEBCO/GMRT (fused, honest to ~3 m/px)"
+    },
+    "fusion1-dem": {
+      "type": "raster-dem",
+      "tiles": ["tiles_fusion1/xyz/{z}/{x}/{y}.png"],
+      "encoding": "terrarium", "tileSize": 256, "minzoom": 8, "maxzoom": 15,
+      "bounds": [32.62, -27.62, 32.82, -27.32],
+      "attribution": "Fusion1: SDB x ATL24 x Garmin Quickdraw sonar x CGS 2005 (inverse-variance fused, 0 to -300 m)"
+    },
+    "fusion1hd-dem": {
+      "type": "raster-dem",
+      "tiles": ["tiles_fusion1_inset/xyz/{z}/{x}/{y}.png"],
+      "encoding": "terrarium", "tileSize": 256, "minzoom": 12, "maxzoom": 16,
+      "bounds": [32.660, -27.620, 32.735, -27.400],
+      "attribution": "Fusion1 HD reef inset: 5 m grid over the dense-Garmin reef strip"
     }
   },
   "layers": [
     { "id": "bg", "type": "background", "paint": { "background-color": "#0a0f1c" } },
-    { "id": "ocean-fill", "type": "fill", "source": "basemap", "source-layer": "water",
-      "paint": { "fill-color": "#0a1b3a" } },
+    { "id": "ocean-fill", "type": "fill", "source": "basemap", "source-layer": "water", "paint": { "fill-color": "#0a1b3a" } },
     {
-      "id": "color-relief",
-      "type": "color-relief",
-      "source": "terrain-dem",
-      "paint": {
-        "color-relief-opacity": 0.85,
-        "color-relief-color": [
-          "interpolate", ["linear"], ["elevation"],
-          -120, "#050510",
-          -60, "#001f7a",
-          -30, "#0077ff",
-          -10, "#00e5ff",
-          0, "#ffffff",
-          0.5, "rgba(255,255,255,0)"
-        ]
-      }
+      "id": "color-relief", "type": "color-relief", "source": "terrain-dem",
+      "paint": { "color-relief-opacity": 0.85,
+        "color-relief-color": ["interpolate", ["linear"], ["elevation"],
+          -120, "#050510", -60, "#001f7a", -30, "#0077ff", -10, "#00e5ff", 0, "#ffffff", 0.5, "rgba(255,255,255,0)"] }
     },
     {
-      "id": "hillshade",
-      "type": "hillshade",
-      "source": "terrain-dem",
-      "paint": {
-        "hillshade-method": "igor",
-        "hillshade-exaggeration": 0.5,
-        "hillshade-shadow-color": "#00121f",
-        "hillshade-highlight-color": "#e8ffff"
-      }
+      "id": "hillshade", "type": "hillshade", "source": "terrain-dem",
+      "paint": { "hillshade-method": "igor", "hillshade-exaggeration": 0.5, "hillshade-shadow-color": "#00121f", "hillshade-highlight-color": "#e8ffff" }
+    },
+    {
+      "id": "fusion1-relief", "type": "color-relief", "source": "fusion1-dem", "layout": { "visibility": "none" },
+      "paint": { "color-relief-opacity": 0.9,
+        "color-relief-color": ["interpolate", ["linear"], ["elevation"],
+          -300, "#020207", -200, "#050514", -120, "#0a0a26", -60, "#002a6b", -30, "#0077ff", -12, "#00e5ff", -3, "#9bffe8", 0, "#eaffff", 0.5, "rgba(255,255,255,0)"] }
+    },
+    {
+      "id": "fusion1-hill", "type": "hillshade", "source": "fusion1-dem", "layout": { "visibility": "none" },
+      "paint": { "hillshade-method": "igor", "hillshade-exaggeration": 0.6, "hillshade-shadow-color": "#00101c", "hillshade-highlight-color": "#eaffff" }
+    },
+    {
+      "id": "fusion1hd-relief", "type": "color-relief", "source": "fusion1hd-dem", "layout": { "visibility": "none" },
+      "paint": { "color-relief-opacity": 0.9,
+        "color-relief-color": ["interpolate", ["linear"], ["elevation"],
+          -300, "#020207", -200, "#050514", -120, "#0a0a26", -60, "#002a6b", -30, "#0077ff", -12, "#00e5ff", -3, "#9bffe8", 0, "#eaffff", 0.5, "rgba(255,255,255,0)"] }
+    },
+    {
+      "id": "fusion1hd-hill", "type": "hillshade", "source": "fusion1hd-dem", "layout": { "visibility": "none" },
+      "paint": { "hillshade-method": "igor", "hillshade-exaggeration": 0.6, "hillshade-shadow-color": "#00101c", "hillshade-highlight-color": "#eaffff" }
     },
     {
       "id": "coastline", "type": "line", "source": "basemap", "source-layer": "boundary",
-      "filter": ["==", ["get", "maritime"], 1],
-      "paint": { "line-color": "#3a5a80", "line-width": 0.6 }
+      "filter": ["==", ["get", "maritime"], 1], "paint": { "line-color": "#3a5a80", "line-width": 0.6 }
     },
     {
       "id": "place-labels", "type": "symbol", "source": "basemap", "source-layer": "place",

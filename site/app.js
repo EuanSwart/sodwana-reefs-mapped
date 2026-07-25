@@ -49,6 +49,7 @@ function depthRamp(prop) {
  * ========================================================== */
 const LAYER_DEFS = [
   { key: '3d',        label: '3D terrain',             def: false, kind: 'terrain' },
+  { key: 'fusion1',   label: 'Fusion1 model (0–300 m)', def: false, kind: 'demswap', sw: '#00e5ff' },
   { key: 'relief',    label: 'Depth colour',           def: true,  sw: 'var(--depth-30)' },
   { key: 'hill',      label: 'Hillshade',              def: true,  sw: '#8aa0bf' },
   { key: 'contour',   label: 'Contours',               def: true,  sw: '#bfe9ff' },
@@ -98,7 +99,12 @@ const state = {
   previewAsVisitor: false,  // admin-only: simulate the visitor view without logging out
   scaleControl: null,       // maplibregl.ScaleControl instance, so we can show/hide its DOM element
   demSource: null,          // maplibre-contour DemSource (also used to sample route depth profiles)
+  demSourceF1: null,        // maplibre-contour DemSource for the Fusion1 DEM (deep contours)
+  activeDem: 'terrain-dem', // which raster-dem drives relief/hillshade/3D ('terrain-dem' | 'fusion1-dem')
+  fusion1: false,           // Fusion1 (0–300 m) DEM mode active?
   lastRoute: null,          // { wp, legsResult, profile } — last confirmed route, for summary export
+  selectedSiteIds: new Set(), // admin: site.properties.id values checked for "export selected"
+  expandedSiteId: null,       // admin: which site row's edit form is open (one at a time)
 };
 LAYER_DEFS.forEach((d) => { state.toggleState[d.key] = d.def; });
 
@@ -175,7 +181,8 @@ async function onLoad(map) {
 
 /* ---------- terrain / 3D ---------- */
 function set3D(map, on, ex) {
-  if (on) { if (!map.getSource('terrain-dem')) return; map.setTerrain({ source: 'terrain-dem', exaggeration: ex }); }
+  const dem = state.activeDem || 'terrain-dem';
+  if (on) { if (!map.getSource(dem)) return; map.setTerrain({ source: dem, exaggeration: ex }); }
   else { map.setTerrain(null); }
 }
 
@@ -212,6 +219,33 @@ async function setupContours(map) {
     layout: { 'symbol-placement': 'line', 'text-field': ['concat', ['number-format', ['get', 'ele'], {}], ' m'], 'text-font': ['Noto Sans Regular'], 'text-size': 10 },
     paint: { 'text-color': '#eafaff', 'text-halo-color': '#0a1830', 'text-halo-width': 1.2 },
   });
+
+  // Fusion1 deep contours (0 → -300 m) — shown only when the Fusion1 DEM is active.
+  try {
+    const f1Base = new URL('tiles_fusion1/xyz/', location.href).href;
+    state.demSourceF1 = new mlcontour.DemSource({ url: f1Base + '{z}/{x}/{y}.png', encoding: 'terrarium', maxzoom: 15, worker: true });
+    state.demSourceF1.setupMaplibre(maplibregl);
+    map.addSource('fusion1-contour-src', {
+      type: 'vector',
+      tiles: [state.demSourceF1.contourProtocolUrl({
+        thresholds: { 10: [50, 100], 12: [20, 100], 14: [10, 50], 15: [5, 25] },
+        elevationKey: 'ele', levelKey: 'level', contourLayer: 'contours',
+      })],
+      maxzoom: 15,
+      bounds: [AOI.lonMin, AOI.latMin, AOI.lonMax, AOI.latMax],
+    });
+    map.addLayer({
+      id: 'fusion1-contour-lines', type: 'line', source: 'fusion1-contour-src', 'source-layer': 'contours',
+      layout: { visibility: 'none' },
+      paint: { 'line-color': '#bfe9ff', 'line-opacity': ['match', ['get', 'level'], 1, 0.9, 0.35], 'line-width': ['match', ['get', 'level'], 1, 1.1, 0.5] },
+    });
+    map.addLayer({
+      id: 'fusion1-contour-labels', type: 'symbol', source: 'fusion1-contour-src', 'source-layer': 'contours',
+      filter: ['>', ['get', 'level'], 0],
+      layout: { visibility: 'none', 'symbol-placement': 'line', 'text-field': ['concat', ['number-format', ['get', 'ele'], {}], ' m'], 'text-font': ['Noto Sans Regular'], 'text-size': 10 },
+      paint: { 'text-color': '#eafaff', 'text-halo-color': '#0a1830', 'text-halo-width': 1.2 },
+    });
+  } catch (e) { console.warn('Fusion1 contours unavailable', e); }
 }
 
 /* ---------- vector overlays ---------- */
@@ -223,18 +257,40 @@ async function loadVector(map, url, id, styler, after) {
   if (after) after(map, gj);
 }
 
+// Substrate fill reads as an accent ON the depth colour, not a wash OVER it: reef classes
+// (the diagnostically useful "where's the actual reef" signal) get a saturated, zoom-growing
+// fill; Sand/Coarse Shelly Sediment (the "nothing to see here" substrate that just repeats
+// what the pale depth colour already implies) get a near-transparent wash so they don't mud
+// the blue-cyan ramp underneath. An unrecognised class renders invisible (no grey fallback
+// wash) rather than a muddy default.
 function geologyStyle(map, id) {
+  const fillOpacity = ['match', ['get', 'geology'],
+    'Prominent Reef', ['interpolate', ['linear'], ['zoom'], 9, 0.22, 12, 0.4, 15, 0.55],
+    'Reef', ['interpolate', ['linear'], ['zoom'], 9, 0.18, 12, 0.34, 15, 0.48],
+    'Scattered Reef', ['interpolate', ['linear'], ['zoom'], 9, 0.14, 12, 0.26, 15, 0.38],
+    'Coarse Shelly Sediment', ['interpolate', ['linear'], ['zoom'], 9, 0.03, 14, 0.1],
+    'Sand', ['interpolate', ['linear'], ['zoom'], 9, 0.02, 14, 0.07],
+    0];
   map.addLayer({
     id: 'geology-fill', type: 'fill', source: id,
     paint: {
-      'fill-opacity': 0.45,
+      'fill-opacity': fillOpacity,
       'fill-color': ['match', ['get', 'geology'],
         'Prominent Reef', C.reefProminent, 'Reef', C.reef, 'Scattered Reef', C.reefScattered,
-        'Coarse Shelly Sediment', C.sedCoarse, 'Sand', C.sedSand, '#9aa7b0'],
+        'Coarse Shelly Sediment', C.sedCoarse, 'Sand', C.sedSand, 'transparent'],
     },
   });
+  // Reef-class boundaries get a visible glow line (the actionable edges divers care about);
+  // sediment classes get a hairline only, present but not competing with the depth contours.
   map.addLayer({ id: 'geology-line', type: 'line', source: id,
-    paint: { 'line-color': '#00121f', 'line-width': 0.3, 'line-opacity': 0.4 } });
+    paint: {
+      'line-color': ['match', ['get', 'geology'],
+        'Prominent Reef', C.reefProminent, 'Reef', C.reef, 'Scattered Reef', C.reefScattered, '#00121f'],
+      'line-width': ['match', ['get', 'geology'],
+        'Prominent Reef', 0.9, 'Reef', 0.7, 'Scattered Reef', 0.5, 0.25],
+      'line-opacity': ['match', ['get', 'geology'],
+        'Prominent Reef', 0.85, 'Reef', 0.7, 'Scattered Reef', 0.55, 0.3],
+    } });
   map.on('click', 'geology-fill', (e) => {
     new maplibregl.Popup().setLngLat(e.lngLat).setHTML(`<b>CGS substrate</b><br>${esc(e.features[0].properties.geology)}`).addTo(map);
   });
@@ -285,10 +341,19 @@ function prospectStyle(map, id) {
 async function loadSites(map) {
   const gj = await getJSON('data/dive_sites.geojson');
   state.sites = gj || fc([]);
+  ensureSiteIds();
   map.addSource('sites', { type: 'geojson', data: sitesForDisplay() });
   diveSiteStyle(map, 'sites');
   applySites(map);
 }
+// Every site gets a stable client-side id (not just its array index, which shifts on
+// import/delete) so the "export selected" checkbox state survives a re-render.
+function ensureSiteIds() {
+  (state.sites.features || []).forEach((f) => {
+    if (!f.properties.id) f.properties.id = genId();
+  });
+}
+function genId() { return 'site_' + Math.random().toString(36).slice(2, 10); }
 // visitors never see features flagged hidden:true; admin sees everything
 // (unless previewing as a visitor — see isEffectiveAdmin())
 function sitesForDisplay() {
@@ -419,9 +484,33 @@ function applyToggle(map, d, on, silent) {
     setRoute(map, on);
   } else if (d.kind === 'scale') {
     setScale(on);
+  } else if (d.kind === 'demswap') {
+    state.fusion1 = on;
+    state.activeDem = on ? 'fusion1-dem' : 'terrain-dem';
+    refreshDemLayers(map);
+    if (state.toggleState['3d']) set3D(map, true, exVal());
+  } else if (d.key === 'relief' || d.key === 'hill' || d.key === 'contour') {
+    refreshDemLayers(map);
   } else {
     (VIS[d.key] || []).forEach((id) => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none'));
   }
+}
+
+// Keep the depth-colour, hillshade and contour layers pointed at whichever DEM is
+// active (baseline terrain-dem, or the Fusion1 0–300 m model), honouring each layer's
+// own on/off toggle.
+function refreshDemLayers(map) {
+  const vis = (id, v) => map.getLayer(id) && map.setLayoutProperty(id, 'visibility', v ? 'visible' : 'none');
+  const f = !!state.fusion1;
+  const reliefOn = state.toggleState['relief'] !== false;
+  const hillOn = state.toggleState['hill'] !== false;
+  const contourOn = state.toggleState['contour'] !== false;
+  vis('color-relief', !f && reliefOn); vis('fusion1-relief', f && reliefOn);
+  vis('hillshade', !f && hillOn); vis('fusion1-hill', f && hillOn);
+  // HD 5 m reef inset draws on top within its bounds when Fusion1 is active
+  vis('fusion1hd-relief', f && reliefOn); vis('fusion1hd-hill', f && hillOn);
+  vis('contour-lines', !f && contourOn); vis('contour-labels', !f && contourOn);
+  vis('fusion1-contour-lines', f && contourOn); vis('fusion1-contour-labels', f && contourOn);
 }
 
 function exVal() { const el = document.getElementById('ex'); return el ? parseFloat(el.value) : 1.6; }
@@ -899,32 +988,50 @@ function renderAdminPanel(map) {
   panel.classList.remove('hidden');
   panel.innerHTML = `
     <div class="section-title" style="margin-top:6px">Admin mode</div>
-    <div class="note">Edits apply to <b>this browser session only</b>. To publish them, Export the file and commit it to the repo.</div>
+    <div class="note">Edits apply to <b>this browser session only</b>. To publish them, Export the file(s) and commit to the repo.</div>
     <div class="admin-actions">
       <button id="admin-preview" class="btn">${state.previewAsVisitor ? 'Exit preview (back to admin)' : 'Preview as visitor'}</button>
       <button id="admin-lock" class="btn">Lock</button>
     </div>
 
-    <div class="section-title">Dive sites — rename &amp; show/hide</div>
+    <div class="section-title">Import dive sites</div>
+    <div class="import-form">
+      <div class="filepick">
+        <button id="site-import-pick" class="btn small" type="button">Choose file…</button>
+        <input type="file" id="site-import-file" accept=".csv,.geojson,.json" hidden />
+        <span class="fname" id="site-import-fname">CSV or GeoJSON — columns/keys: name, lat, lon, depth_min_m, depth_max_m, description</span>
+      </div>
+      <div class="row2">
+        <input type="text" id="site-import-collection" placeholder="Collection / folder (optional)">
+        <button id="site-import-go" class="btn" type="button" disabled>Import</button>
+      </div>
+      <div class="import-status" id="site-import-status"></div>
+    </div>
+
+    <div class="section-title">Add a site manually</div>
+    <div class="add-form">
+      <div class="row2"><input type="text" id="site-add-name" placeholder="Name*"><input type="text" id="site-add-collection" placeholder="Collection / folder"></div>
+      <div class="row2"><input type="text" id="site-add-lat" placeholder="Lat (decimal)*"><input type="text" id="site-add-lon" placeholder="Lon (decimal)*"></div>
+      <div class="row2"><input type="text" id="site-add-dmin" placeholder="Min depth (m)"><input type="text" id="site-add-dmax" placeholder="Max depth (m)"></div>
+      <input type="text" id="site-add-desc" placeholder="Description (optional)">
+      <button id="site-add-go" class="btn primary" type="button">Add site</button>
+      <div class="import-status" id="site-add-status"></div>
+    </div>
+
+    <div class="section-title">Dive sites — edit, organise &amp; show/hide</div>
     <div id="admin-sites" class="admin-list"></div>
-    <div class="admin-actions"><button id="export-sites" class="btn primary">Export dive_sites.geojson</button></div>
+    <div class="admin-actions">
+      <button id="export-sites" class="btn primary">Export all (dive_sites.geojson)</button>
+      <button id="export-sites-sel" class="btn">Export selected (<span id="sel-count">0</span>)</button>
+    </div>
 
     <div class="section-title">Visitor layers — visible to everyone</div>
     <div id="admin-layers" class="admin-list"></div>
     <div class="admin-actions"><button id="export-config" class="btn primary">Export layer_config.json</button></div>`;
 
-  // ---- site rows ----
-  const sbox = panel.querySelector('#admin-sites');
-  (state.sites.features || []).forEach((f, i) => {
-    const p = f.properties;
-    const row = document.createElement('div'); row.className = 'arow';
-    row.innerHTML = `<input type="checkbox" title="Show to visitors" ${p.hidden === true ? '' : 'checked'}>
-      <input type="text" value="${esc(p.name)}">`;
-    const [cb, tx] = row.querySelectorAll('input');
-    cb.onchange = () => { f.properties.hidden = !cb.checked; applySites(map); };
-    tx.onchange = () => { f.properties.name = tx.value.trim() || f.properties.name; applySites(map); };
-    sbox.appendChild(row);
-  });
+  renderSiteManagerList(map);
+  wireSiteImport(map);
+  wireSiteAdd(map);
 
   // ---- layer availability rows ----
   const lbox = panel.querySelector('#admin-layers');
@@ -942,9 +1049,264 @@ function renderAdminPanel(map) {
   panel.querySelector('#admin-preview').onclick = () => togglePreviewAsVisitor(map);
   panel.querySelector('#admin-lock').onclick = () => lockAdmin(map);
   panel.querySelector('#export-sites').onclick = () => download('dive_sites.geojson', JSON.stringify(state.sites, null, 2));
+  panel.querySelector('#export-sites-sel').onclick = () => {
+    const feats = (state.sites.features || []).filter((f) => state.selectedSiteIds.has(f.properties.id));
+    if (!feats.length) { window.alert('No sites selected. Tick the checkbox next to each site you want to export.'); return; }
+    download('dive_sites_selected.geojson', JSON.stringify(fc(feats), null, 2));
+  };
   panel.querySelector('#export-config').onclick = () => {
     const cfg = {}; LAYER_DEFS.forEach((d) => { cfg[d.key] = state.layerConfig[d.key] !== false; });
     download('layer_config.json', JSON.stringify(cfg, null, 2));
+  };
+}
+
+/* ---- dive-site manager: grouped, editable, selectable list ---- */
+function siteCollection(f) { return (f.properties.collection && String(f.properties.collection).trim()) || 'Uncategorized'; }
+
+function renderSiteManagerList(map) {
+  const panel = document.getElementById('admin-panel');
+  const sbox = panel.querySelector('#admin-sites');
+  const selCount = panel.querySelector('#sel-count');
+  sbox.innerHTML = '';
+  const feats = state.sites.features || [];
+  selCount.textContent = String(state.selectedSiteIds.size);
+
+  const groups = new Map();
+  feats.forEach((f) => {
+    const k = siteCollection(f);
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(f);
+  });
+  const order = [...groups.keys()].sort((a, b) => (a === 'Uncategorized' ? 1 : b === 'Uncategorized' ? -1 : a.localeCompare(b)));
+
+  order.forEach((coll) => {
+    const head = document.createElement('div'); head.className = 'collgroup';
+    head.textContent = `${coll} (${groups.get(coll).length})`;
+    sbox.appendChild(head);
+    groups.get(coll).forEach((f) => sbox.appendChild(buildSiteRow(map, f)));
+  });
+}
+
+function buildSiteRow(map, f) {
+  const p = f.properties;
+  const id = p.id;
+  const row = document.createElement('div'); row.className = 'arow site-row';
+  row.innerHTML = `
+    <input type="checkbox" class="sel-cb" title="Select for export" ${state.selectedSiteIds.has(id) ? 'checked' : ''}>
+    <input type="checkbox" class="vis-cb" title="Show to visitors" ${p.hidden === true ? '' : 'checked'}>
+    <input type="text" class="nm-tx" value="${esc(p.name)}">
+    <button class="btn small expandbtn" type="button">${state.expandedSiteId === id ? 'Close' : 'Edit'}</button>`;
+  const selCb = row.querySelector('.sel-cb');
+  const visCb = row.querySelector('.vis-cb');
+  const nmTx = row.querySelector('.nm-tx');
+  const expandBtn = row.querySelector('.expandbtn');
+
+  selCb.onchange = () => {
+    if (selCb.checked) state.selectedSiteIds.add(id); else state.selectedSiteIds.delete(id);
+    const selCount = document.getElementById('sel-count');
+    if (selCount) selCount.textContent = String(state.selectedSiteIds.size);
+  };
+  visCb.onchange = () => { f.properties.hidden = !visCb.checked; applySites(map); };
+  nmTx.onchange = () => { f.properties.name = nmTx.value.trim() || f.properties.name; applySites(map); };
+  expandBtn.onclick = () => {
+    state.expandedSiteId = (state.expandedSiteId === id) ? null : id;
+    renderSiteManagerList(map);
+  };
+
+  if (state.expandedSiteId === id) {
+    const [lon, lat] = f.geometry.coordinates;
+    const edit = document.createElement('div'); edit.className = 'site-edit';
+    edit.innerHTML = `
+      <div><label>Latitude</label><input type="text" class="e-lat" value="${lat}"></div>
+      <div><label>Longitude</label><input type="text" class="e-lon" value="${lon}"></div>
+      <div><label>Min depth (m)</label><input type="text" class="e-dmin" value="${p.depth_min_m ?? ''}"></div>
+      <div><label>Max depth (m)</label><input type="text" class="e-dmax" value="${p.depth_max_m ?? ''}"></div>
+      <div class="full"><label>Collection / folder</label><input type="text" class="e-coll" value="${esc(siteCollection(f) === 'Uncategorized' ? '' : siteCollection(f))}" placeholder="Uncategorized"></div>
+      <div class="full"><label>Description</label><textarea class="e-desc">${esc(p.description || '')}</textarea></div>
+      <div class="full admin-actions" style="margin:2px 0 0">
+        <button class="btn small e-save" type="button">Save</button>
+        <button class="btn small danger e-delete" type="button">Delete site</button>
+      </div>`;
+    const g = (cls) => edit.querySelector(cls);
+    g('.e-save').onclick = () => {
+      const newLat = parseFloat(g('.e-lat').value), newLon = parseFloat(g('.e-lon').value);
+      if (Number.isFinite(newLat) && Number.isFinite(newLon)) f.geometry.coordinates = [newLon, newLat];
+      const dmin = g('.e-dmin').value.trim(), dmax = g('.e-dmax').value.trim();
+      f.properties.depth_min_m = dmin === '' ? undefined : parseFloat(dmin);
+      f.properties.depth_max_m = dmax === '' ? undefined : parseFloat(dmax);
+      f.properties.description = g('.e-desc').value.trim() || undefined;
+      f.properties.collection = g('.e-coll').value.trim() || undefined;
+      applySites(map);
+      renderSiteManagerList(map);
+    };
+    g('.e-delete').onclick = () => {
+      if (!window.confirm(`Delete "${p.name}"? This only affects your current browser session until you export.`)) return;
+      state.sites.features = state.sites.features.filter((x) => x !== f);
+      state.selectedSiteIds.delete(id);
+      state.expandedSiteId = null;
+      applySites(map);
+      renderSiteManagerList(map);
+    };
+    row.appendChild(edit);
+  }
+  return row;
+}
+
+/* ---- import (CSV / GeoJSON) ---- */
+function wireSiteImport(map) {
+  const pick = document.getElementById('site-import-pick');
+  const file = document.getElementById('site-import-file');
+  const fname = document.getElementById('site-import-fname');
+  const go = document.getElementById('site-import-go');
+  const status = document.getElementById('site-import-status');
+  let picked = null;
+  pick.onclick = () => file.click();
+  file.onchange = () => {
+    picked = file.files && file.files[0];
+    fname.textContent = picked ? picked.name : 'CSV or GeoJSON — columns/keys: name, lat, lon, depth_min_m, depth_max_m, description';
+    go.disabled = !picked;
+    status.textContent = ''; status.className = 'import-status';
+  };
+  go.onclick = async () => {
+    if (!picked) return;
+    const collection = document.getElementById('site-import-collection').value.trim() || undefined;
+    status.className = 'import-status'; status.textContent = 'Reading…';
+    try {
+      const text = await picked.text();
+      const isJson = /\.(geojson|json)$/i.test(picked.name) || text.trim().startsWith('{') || text.trim().startsWith('[');
+      const parsed = isJson ? parseSitesFromGeoJSON(text) : parseSitesFromCSV(text);
+      if (!parsed.features.length) {
+        status.className = 'import-status err';
+        status.textContent = parsed.errors.length ? `No sites imported: ${parsed.errors[0]}` : 'No sites found in file.';
+        return;
+      }
+      parsed.features.forEach((f) => {
+        f.properties.id = genId();
+        f.properties.verified = false;
+        if (collection) f.properties.collection = collection;
+      });
+      state.sites.features = (state.sites.features || []).concat(parsed.features);
+      applySites(map);
+      renderSiteManagerList(map);
+      const skipped = parsed.errors.length ? ` (${parsed.errors.length} row(s) skipped: ${parsed.errors.slice(0, 3).join('; ')}${parsed.errors.length > 3 ? '…' : ''})` : '';
+      status.className = 'import-status';
+      status.textContent = `Imported ${parsed.features.length} site(s)${skipped}.`;
+      file.value = ''; picked = null; go.disabled = true;
+      fname.textContent = 'CSV or GeoJSON — columns/keys: name, lat, lon, depth_min_m, depth_max_m, description';
+    } catch (err) {
+      status.className = 'import-status err';
+      status.textContent = `Import failed: ${err.message || err}`;
+    }
+  };
+}
+
+// Flexible column-name matching: accepts common aliases so an export from any dive-log app
+// or a hand-built spreadsheet is likely to "just work" without a required exact header.
+const COL_ALIASES = {
+  name: ['name', 'site', 'site_name', 'sitename', 'title'],
+  lat: ['lat', 'latitude', 'y'],
+  lon: ['lon', 'lng', 'long', 'longitude', 'x'],
+  depth_min_m: ['depth_min_m', 'min_depth', 'mindepth', 'depth_min', 'min_depth_m'],
+  depth_max_m: ['depth_max_m', 'max_depth', 'maxdepth', 'depth_max', 'max_depth_m', 'depth', 'depth_m'],
+  description: ['description', 'desc', 'notes', 'note', 'comment'],
+  collection: ['collection', 'folder', 'group', 'category'],
+};
+function matchCol(headerLower, field) {
+  const idx = headerLower.findIndex((h) => COL_ALIASES[field].includes(h));
+  return idx;
+}
+function parseCsvLine(line) {
+  const out = []; let cur = ''; let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (inQ) {
+      if (c === '"') { if (line[i + 1] === '"') { cur += '"'; i++; } else inQ = false; }
+      else cur += c;
+    } else if (c === '"') inQ = true;
+    else if (c === ',') { out.push(cur); cur = ''; }
+    else cur += c;
+  }
+  out.push(cur);
+  return out;
+}
+function parseSitesFromCSV(text) {
+  const lines = text.split(/\r\n|\n|\r/).filter((l) => l.trim() !== '');
+  const errors = [];
+  if (!lines.length) return { features: [], errors: ['file is empty'] };
+  const header = parseCsvLine(lines[0]).map((h) => h.trim().toLowerCase());
+  const ci = {
+    name: matchCol(header, 'name'), lat: matchCol(header, 'lat'), lon: matchCol(header, 'lon'),
+    depth_min_m: matchCol(header, 'depth_min_m'), depth_max_m: matchCol(header, 'depth_max_m'),
+    description: matchCol(header, 'description'), collection: matchCol(header, 'collection'),
+  };
+  if (ci.lat < 0 || ci.lon < 0) return { features: [], errors: ['could not find latitude/longitude columns'] };
+  const features = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCsvLine(lines[i]);
+    const lat = parseFloat(cols[ci.lat]), lon = parseFloat(cols[ci.lon]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) { errors.push(`row ${i + 1}: bad coordinates`); continue; }
+    const props = { name: (ci.name >= 0 && cols[ci.name] && cols[ci.name].trim()) || `Imported site ${features.length + 1}` };
+    if (ci.depth_min_m >= 0 && cols[ci.depth_min_m] !== undefined && cols[ci.depth_min_m] !== '') props.depth_min_m = parseFloat(cols[ci.depth_min_m]);
+    if (ci.depth_max_m >= 0 && cols[ci.depth_max_m] !== undefined && cols[ci.depth_max_m] !== '') props.depth_max_m = parseFloat(cols[ci.depth_max_m]);
+    if (ci.description >= 0 && cols[ci.description]) props.description = cols[ci.description].trim();
+    if (ci.collection >= 0 && cols[ci.collection]) props.collection = cols[ci.collection].trim();
+    features.push({ type: 'Feature', properties: props, geometry: { type: 'Point', coordinates: [lon, lat] } });
+  }
+  return { features, errors };
+}
+function parseSitesFromGeoJSON(text) {
+  let data;
+  try { data = JSON.parse(text); } catch (e) { return { features: [], errors: [`invalid JSON: ${e.message}`] }; }
+  const errors = [];
+  let rawFeatures;
+  if (data && data.type === 'FeatureCollection') rawFeatures = data.features || [];
+  else if (data && data.type === 'Feature') rawFeatures = [data];
+  else if (Array.isArray(data)) {
+    // tolerant: an array of plain {name, lat, lon, ...} objects, not real GeoJSON
+    rawFeatures = data.map((r) => {
+      const lat = r.lat ?? r.latitude ?? r.y, lon = r.lon ?? r.lng ?? r.longitude ?? r.x;
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+      return { type: 'Feature', properties: { ...r }, geometry: { type: 'Point', coordinates: [lon, lat] } };
+    }).filter(Boolean);
+  } else return { features: [], errors: ['unrecognised GeoJSON structure'] };
+
+  const features = [];
+  rawFeatures.forEach((f, i) => {
+    if (!f || f.geometry?.type !== 'Point' || !Array.isArray(f.geometry.coordinates)) { errors.push(`feature ${i + 1}: not a Point`); return; }
+    const [lon, lat] = f.geometry.coordinates;
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) { errors.push(`feature ${i + 1}: bad coordinates`); return; }
+    const props = { ...(f.properties || {}) };
+    if (!props.name) props.name = `Imported site ${features.length + 1}`;
+    features.push({ type: 'Feature', properties: props, geometry: { type: 'Point', coordinates: [lon, lat] } });
+  });
+  return { features, errors };
+}
+
+/* ---- manual add ---- */
+function wireSiteAdd(map) {
+  const go = document.getElementById('site-add-go');
+  const status = document.getElementById('site-add-status');
+  go.onclick = () => {
+    const name = document.getElementById('site-add-name').value.trim();
+    const lat = parseFloat(document.getElementById('site-add-lat').value);
+    const lon = parseFloat(document.getElementById('site-add-lon').value);
+    if (!name) { status.className = 'import-status err'; status.textContent = 'Name is required.'; return; }
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) { status.className = 'import-status err'; status.textContent = 'Valid latitude and longitude are required.'; return; }
+    const dminV = document.getElementById('site-add-dmin').value.trim();
+    const dmaxV = document.getElementById('site-add-dmax').value.trim();
+    const collection = document.getElementById('site-add-collection').value.trim() || undefined;
+    const description = document.getElementById('site-add-desc').value.trim() || undefined;
+    const props = { id: genId(), name, verified: false };
+    if (dminV !== '') props.depth_min_m = parseFloat(dminV);
+    if (dmaxV !== '') props.depth_max_m = parseFloat(dmaxV);
+    if (collection) props.collection = collection;
+    if (description) props.description = description;
+    state.sites.features = (state.sites.features || []).concat([{ type: 'Feature', properties: props, geometry: { type: 'Point', coordinates: [lon, lat] } }]);
+    applySites(map);
+    renderSiteManagerList(map);
+    status.className = 'import-status'; status.textContent = `Added "${name}".`;
+    ['site-add-name', 'site-add-collection', 'site-add-lat', 'site-add-lon', 'site-add-dmin', 'site-add-dmax', 'site-add-desc']
+      .forEach((id) => { document.getElementById(id).value = ''; });
   };
 }
 
